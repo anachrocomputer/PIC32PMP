@@ -86,7 +86,7 @@ struct UART_BUFFER
 };
 
 // UART buffers
-static struct UART_BUFFER U4Buf;
+static struct UART_BUFFER U3Buf;
 
 volatile uint32_t MilliSeconds = 0;
 volatile uint32_t SPIword = 0;
@@ -203,157 +203,109 @@ void __ISR(_SPI_3_VECTOR, ipl1) SPI3Handler(void)
     }
 }
 
-void __ISR(_UART_4_VECTOR, ipl1) UART4Handler(void) 
-{
-    if (IFS2bits.U4TXIF)
-    {
-        if (U4Buf.tx.head != U4Buf.tx.tail) // Is there anything to send?
-        {
-            const uint8_t tmptail = (U4Buf.tx.tail + 1) & UART_TX_BUFFER_MASK;
-            
-            U4Buf.tx.tail = tmptail;
 
-            U4TXREG = U4Buf.tx.buf[tmptail];     // Transmit one byte
+void __ISR(_UART_3_VECTOR, ipl1) UART3Handler(void) 
+{
+    if (IFS2bits.U3TXIF)
+    {
+        if (U3Buf.tx.head != U3Buf.tx.tail) // Is there anything to send?
+        {
+            const uint8_t tmptail = (U3Buf.tx.tail + 1) & UART_TX_BUFFER_MASK;
+            
+            U3Buf.tx.tail = tmptail;
+
+            U3TXREG = U3Buf.tx.buf[tmptail];     // Transmit one byte
         }
         else
         {
-            IEC2CLR = _IEC2_U4TXIE_MASK;         // Nothing left to send; disable Tx interrupt
+            IEC2CLR = _IEC2_U3TXIE_MASK;         // Nothing left to send; disable Tx interrupt
         }
         
-        IFS2CLR = _IFS2_U4TXIF_MASK;  // Clear UART4 Tx interrupt flag
+        IFS2CLR = _IFS2_U3TXIF_MASK;  // Clear UART3 Tx interrupt flag
     }
     
-    if (IFS2bits.U4RXIF)
+    if (IFS1bits.U3RXIF)
     {
-        const uint8_t tmphead = (U4Buf.rx.head + 1) & UART_RX_BUFFER_MASK;
-        const uint8_t ch = U4RXREG;   // Read received byte from UART
+        const uint8_t tmphead = (U3Buf.rx.head + 1) & UART_RX_BUFFER_MASK;
+        const uint8_t ch = U3RXREG;   // Read received byte from UART
         
-        if (tmphead == U4Buf.rx.tail)   // Is receive buffer full?
+        if (tmphead == U3Buf.rx.tail)   // Is receive buffer full?
         {
              // Buffer is full; discard new byte
         }
         else
         {
-            U4Buf.rx.head = tmphead;
-            U4Buf.rx.buf[tmphead] = ch;   // Store byte in buffer
+            U3Buf.rx.head = tmphead;
+            U3Buf.rx.buf[tmphead] = ch;   // Store byte in buffer
         }
         
-        IFS2CLR = _IFS2_U4RXIF_MASK;  // Clear UART4 Rx interrupt flag
+        IFS1CLR = _IFS1_U3RXIF_MASK;  // Clear UART3 Rx interrupt flag
     }
     
-    if (IFS2bits.U4EIF)
+    if (IFS1bits.U3EIF)
     {
-        IFS2CLR = _IFS2_U4EIF_MASK;   // Clear UART4 error interrupt flag
+        IFS1CLR = _IFS1_U3EIF_MASK;   // Clear UART3 error interrupt flag
     }
 }
 
-static void UART1_begin(const int baud)
-{
-    U1MODEbits.UEN = 3;     // Use just Rx/Tx; no handshaking
-    
-    U1STAbits.UTXEN = 1;    // Enable Tx
-    U1STAbits.URXEN = 1;    // Enable Rx (unused at present)
-    
-    U1BRG = (40000000 / (baud * 16)) - 1;
-    
-    U1MODESET = _U1MODE_ON_MASK;      // Enable USART1
-}
-
-static void UART2_begin(const int baud)
-{
-    U2MODEbits.UEN = 3;     // Use just Rx/Tx; no handshaking
-    
-    U2STAbits.UTXEN = 1;    // Enable Tx
-    U2STAbits.URXEN = 1;    // Enable Rx (unused at present)
-    
-    U2BRG = (40000000 / (baud * 16)) - 1;
-    
-    U2MODESET = _U2MODE_ON_MASK;      // Enable USART2
-}
 
 static void UART3_begin(const int baud)
 {
+    U3Buf.tx.head = 0;
+    U3Buf.tx.tail = 0;
+    U3Buf.rx.head = 0;
+    U3Buf.rx.tail = 0;
+
     U3MODEbits.UEN = 3;     // Use just Rx/Tx; no handshaking
     
     U3STAbits.UTXEN = 1;    // Enable Tx
-    U3STAbits.URXEN = 1;    // Enable Rx (unused at present)
+    U3STAbits.URXEN = 1;    // Enable Rx
     
     U3BRG = (40000000 / (baud * 16)) - 1;
+    
+    IPC9bits.U3IP = 1;          // UART3 interrupt priority 1
+    IPC9bits.U3IS = 0;          // UART3 interrupt sub-priority 0
+    
+    IFS2CLR = _IFS2_U3TXIF_MASK;  // Clear UART3 Tx interrupt flag
+    IFS1CLR = _IFS1_U3RXIF_MASK;  // Clear UART3 Rx interrupt flag
+    IFS1CLR = _IFS1_U3EIF_MASK;   // Clear UART3 error interrupt flag
+    
+    IEC1SET = _IEC1_U3RXIE_MASK;  // Enable UART3 Rx interrupt
+    IEC1SET = _IEC1_U3EIE_MASK;   // Enable UART3 error interrupt
     
     U3MODESET = _U3MODE_ON_MASK;      // Enable USART3
 }
 
-static void UART4_begin(const int baud)
+uint8_t UART3RxByte(void)
 {
-    U4Buf.tx.head = 0;
-    U4Buf.tx.tail = 0;
-    U4Buf.rx.head = 0;
-    U4Buf.rx.tail = 0;
-
-    U4MODEbits.UEN = 3;     // Use just Rx/Tx; no handshaking
+    const uint8_t tmptail = (U3Buf.rx.tail + 1) & UART_RX_BUFFER_MASK;
     
-    U4STAbits.UTXEN = 1;    // Enable Tx
-    U4STAbits.URXEN = 1;    // Enable Rx
-    
-    U4BRG = (40000000 / (baud * 16)) - 1;
-    
-    IPC9bits.U4IP = 1;          // UART4 interrupt priority 1
-    IPC9bits.U4IS = 2;          // UART4 interrupt sub-priority 2
-    
-    IFS2CLR = _IFS2_U4TXIF_MASK;  // Clear UART4 Tx interrupt flag
-    IFS2CLR = _IFS2_U4RXIF_MASK;  // Clear UART4 Rx interrupt flag
-    IFS2CLR = _IFS2_U4EIF_MASK;   // Clear UART4 error interrupt flag
-    
-    IEC2SET = _IEC2_U4RXIE_MASK;  // Enable UART4 Rx interrupt
-    IEC2SET = _IEC2_U4EIE_MASK;   // Enable UART4 error interrupt
-    
-    U4MODESET = _U4MODE_ON_MASK;      // Enable USART4
-}
-
-
-uint8_t UART4RxByte(void)
-{
-    const uint8_t tmptail = (U4Buf.rx.tail + 1) & UART_RX_BUFFER_MASK;
-    
-    while (U4Buf.rx.head == U4Buf.rx.tail)  // Wait, if buffer is empty
+    while (U3Buf.rx.head == U3Buf.rx.tail)  // Wait, if buffer is empty
         ;
     
-    U4Buf.rx.tail = tmptail;
+    U3Buf.rx.tail = tmptail;
     
-    return (U4Buf.rx.buf[tmptail]);
+    return (U3Buf.rx.buf[tmptail]);
 }
 
 
-void UART4TxByte(const uint8_t data)
+void UART3TxByte(const uint8_t data)
 {
-    const uint8_t tmphead = (U4Buf.tx.head + 1) & UART_TX_BUFFER_MASK;
+    const uint8_t tmphead = (U3Buf.tx.head + 1) & UART_TX_BUFFER_MASK;
     
-    while (tmphead == U4Buf.tx.tail)   // Wait, if buffer is full
+    while (tmphead == U3Buf.tx.tail)   // Wait, if buffer is full
         ;
 
-    U4Buf.tx.buf[tmphead] = data;
-    U4Buf.tx.head = tmphead;
+    U3Buf.tx.buf[tmphead] = data;
+    U3Buf.tx.head = tmphead;
 
-    IEC2SET = _IEC2_U4TXIE_MASK;       // Enable UART4 Tx interrupt
+    IEC2SET = _IEC2_U3TXIE_MASK;       // Enable UART3 Tx interrupt
 }
 
 
-bool UART4RxAvailable(void)
+bool UART3RxAvailable(void)
 {
-    return (U4Buf.rx.head != U4Buf.rx.tail);
-}
-
-
-static void UART5_begin(const int baud)
-{
-    U5MODEbits.UEN = 3;     // Use just Rx/Tx; no handshaking
-    
-    U5STAbits.UTXEN = 1;    // Enable Tx
-    U5STAbits.URXEN = 1;    // Enable Rx (unused at present)
-    
-    U5BRG = (40000000 / (baud * 16)) - 1;
-    
-    U5MODESET = _U5MODE_ON_MASK;      // Enable USART5
+    return (U3Buf.rx.head != U3Buf.rx.tail);
 }
 
 
@@ -465,25 +417,9 @@ void toneT2(const int freq)
 
 static void PPS_begin(void)
 {
-    /* Configure USART1 */
-    RPE5Rbits.RPE5R = 3;    // U1Tx on pin 3, RPE5
-    U1RXRbits.U1RXR = 10;   // U1Rx on pin 6, RPC1
-    
-    /* Configure USART2 */
-    RPG0Rbits.RPG0R = 1;    // U2Tx on pin 90, RPG0
-    U2RXRbits.U2RXR = 12;   // U2Rx on pin 89, RPG1 (5V tolerant)
-    
     /* Configure USART3 */
-    RPF1Rbits.RPF1R = 1;    // U3Tx on pin 88, RPF1
-    U3RXRbits.U3RXR = 4;    // U3Rx on pin 87, RPF0
-    
-    /* Configure USART4 */
-    RPD4Rbits.RPD4R = 2;    // U4Tx on pin 81, RPD4
-    U4RXRbits.U4RXR = 6;    // U4Rx on pin 82, RPD5 (5V tolerant)
-    
-    /* Configure USART5 */
-    RPD12Rbits.RPD12R = 4;  // U5Tx on pin 79, RPD12
-    U5RXRbits.U5RXR = 0;    // U5Rx on pin 76, RPD1
+    RPC1Rbits.RPC1R = 1;    // U3Tx on pin 6, RPC1, P2 pin 6
+    U3RXRbits.U3RXR = 10;   // U3Rx on pin 9, RPC4, P2 pin 9 (5V tolerant)
     
     /* Configure OC pins (PWM) */
     RPD8Rbits.RPD8R = 12; // OC1 on pin 68, P3 pin 18 (LED PWM)
@@ -532,11 +468,7 @@ void main(void)
     /* Configure tri-state registers */
     TRIS_begin();
     
-    UART1_begin(9600);
-    UART2_begin(9600);
     UART3_begin(9600);
-    UART4_begin(9600);
-    UART5_begin(9600);
     
     SPI2_begin(2000000);
     SPI3_begin(1000000);
@@ -602,13 +534,11 @@ void main(void)
     
     __asm__("EI");              // Global interrupt enable
     
-    UART4TxByte('\r');
-    UART4TxByte('\n');
+    UART3TxByte('\r');
+    UART3TxByte('\n');
     
     while(1)
     {
-        U1TXREG = 'A';
-        
         LED1 = 0;
         
         SPIword = 0x0000;
@@ -639,9 +569,9 @@ void main(void)
         delayms(500);
         
         
-        if (UART4RxAvailable())
+        if (UART3RxAvailable())
         {
-            ch = UART4RxByte();
+            ch = UART3RxByte();
         }
         else
         {
@@ -652,10 +582,10 @@ void main(void)
         
         for (i = 0; buf[i] != '\0'; i++)
         {
-            while (U2STAbits.UTXBF) // Wait while Tx buffer full
-                ;
+            //while (U2STAbits.UTXBF) // Wait while Tx buffer full
+            //    ;
             
-            U2TXREG = buf[i];
+            //U2TXREG = buf[i];
         }
         
         LED1 = 1;
@@ -667,8 +597,6 @@ void main(void)
         
         delayms(500);
         
-        U3TXREG = 'C';
-        
         LED1 = 0;
         
         SPIword = 0x55AA;
@@ -678,14 +606,14 @@ void main(void)
         
         delayms(500);
         
-        UART4TxByte('D');
-        UART4TxByte('E');
-        UART4TxByte('A');
-        UART4TxByte('D');
-        UART4TxByte('B');
-        UART4TxByte('E');
-        UART4TxByte('E');
-        UART4TxByte('F');
+        UART3TxByte('D');
+        UART3TxByte('E');
+        UART3TxByte('A');
+        UART3TxByte('D');
+        UART3TxByte('B');
+        UART3TxByte('E');
+        UART3TxByte('E');
+        UART3TxByte('F');
         
         LED1 = 1;
         
@@ -694,8 +622,6 @@ void main(void)
         toneT2(0);
         
         delayms(500);
-        
-        U5TXREG = 'E';
         
         LED1 = 1;
         
