@@ -237,24 +237,6 @@ bool UART3RxAvailable(void)
 }
 
 
-/* toneT2 --- generate a tone of the given frequency via Timer 2 and OC2 */
-
-void toneT2(const int freq)
-{
-    if (freq == 0)
-    {
-        OC2RS = 0;
-    }
-    else
-    {
-        const int div = (40000000 / 64) / freq;
-        TMR2 = 0x00;                // Clear Timer 2 counter
-        PR2 = div;
-        OC2RS = div / 2;
-    }
-}
-
-
 /* PPS_begin --- map Peripheral Pin Select to suit dev board */
 
 static void PPS_begin(void)
@@ -262,10 +244,6 @@ static void PPS_begin(void)
     /* Configure USART3 */
     RPC1Rbits.RPC1R = 1;    // U3Tx on pin 6, RPC1, P2 pin 6
     U3RXRbits.U3RXR = 10;   // U3Rx on pin 9, RPC4, P2 pin 9 (5V tolerant)
-    
-    /* Configure OC pins (PWM) */
-    RPD8Rbits.RPD8R = 12; // OC1 on pin 68, P3 pin 18 (LED PWM)
-    RPD0Rbits.RPD0R = 11; // OC2 on pin 72, P3 pin 22 (tone)
     
     /* Configure SPI1 */
     // SCK1 on pin 70, RD10 clashes with PMP
@@ -299,8 +277,6 @@ static void TRIS_begin(void)
 
 void main(void)
 {
-    char buf[32];
-    int i;
     uint8_t ch;
     
     /* Set up peripherals to match pin connections on PCB */
@@ -310,36 +286,6 @@ void main(void)
     TRIS_begin();
     
     UART3_begin(9600);
-    
-    /* Configure Timer 2 for tone generation via PWM */
-    T2CONbits.TCKPS = 6;        // Timer 2 prescale: 64
-    
-    TMR2 = 0x00;                // Clear Timer 2 counter
-    PR2 = 1420;                 // Divisor for 440Hz
-    
-    T2CONbits.ON = 1;           // Enable Timer 2
-    
-    OC2CONbits.OCTSEL = 0;      // Source: Timer 2
-    OC2CONbits.OCM = 6;         // PWM mode
-    
-    OC2RS = 0;                  // Silent
-    
-    OC2CONbits.ON = 1;          // Enable OC2 PWM
-    
-    /* Configure Timer 3 for 10-bit PWM */
-    T3CONbits.TCKPS = 6;        // Timer 3 prescale: 64
-    
-    TMR3 = 0x00;                // Clear Timer 3 counter
-    PR3 = 1023;                 // PWM range 0..1023 (10 bits)
-    
-    T3CONbits.ON = 1;           // Enable Timer 3
-    
-    OC1CONbits.OCTSEL = 1;      // Source: Timer 3
-    OC1CONbits.OCM = 6;         // PWM mode
-    
-    OC1RS = 256;
-    
-    OC1CONbits.ON = 1;          // Enable OC1 PWM
             
     /* Configure Timer 1 */
     T1CONbits.TCKPS = 0;        // Timer 1 prescale: 1
@@ -367,9 +313,6 @@ void main(void)
         LED1 = 0;
         LED2 = 1;
         
-        OC1RS = 0;
-        toneT2(440);
-
         delayms(500);
         
         
@@ -381,30 +324,14 @@ void main(void)
         {
             ch = '*';
         }
-        
-        sprintf(buf, "%dms %c\r\n", millis(), ch);
-        
-        for (i = 0; buf[i] != '\0'; i++)
-        {
-            //while (U2STAbits.UTXBF) // Wait while Tx buffer full
-            //    ;
-            
-            //U2TXREG = buf[i];
-        }
-        
+               
         LED1 = 1;
         LED2 = 1;
-        
-        OC1RS = 128;
-        toneT2(0);
-        
+                
         delayms(500);
         
         LED1 = 0;
         LED2 = 0;
-        
-        OC1RS = 256;
-        toneT2(880);
         
         delayms(500);
         
@@ -434,16 +361,10 @@ void main(void)
         LED1 = 1;
         LED2 = 0;
         
-        OC1RS = 512;
-        toneT2(0);
-        
         delayms(500);
         
         LED1 = 1;
         LED2 = 0;
-        
-        OC1RS = 1023;
-        toneT2(440 * 8);
         
         delayms(500);
     }
