@@ -611,14 +611,28 @@ void main(void)
         
         delayms(500);
         
-        UART3TxByte('D');
-        UART3TxByte('E');
-        UART3TxByte('A');
-        UART3TxByte('D');
-        UART3TxByte('B');
-        UART3TxByte('E');
-        UART3TxByte('E');
-        UART3TxByte('F');
+        if (PORTAbits.RA1 == 0)
+        {
+            UART3TxByte('P');
+            UART3TxByte('R');
+            UART3TxByte('E');
+            UART3TxByte('S');
+            UART3TxByte('S');
+            UART3TxByte('E');
+            UART3TxByte('D');
+            UART3TxByte('!');
+        }
+        else
+        {
+            UART3TxByte('D');
+            UART3TxByte('E');
+            UART3TxByte('A');
+            UART3TxByte('D');
+            UART3TxByte('B');
+            UART3TxByte('E');
+            UART3TxByte('E');
+            UART3TxByte('F');
+        }
         
         LED1 = 1;
         LED2 = 0;
