@@ -90,7 +90,6 @@ struct UART_BUFFER
 static struct UART_BUFFER U3Buf;
 
 volatile uint32_t MilliSeconds = 0;
-volatile uint32_t SPIword = 0;
 
 volatile int SPINbytes = 0;
 volatile uint8_t *SPIBuf = NULL;
@@ -127,31 +126,6 @@ static uint32_t millis(void)
 }
 
 
-void __ISR(_TIMER_4_VECTOR, ipl4) Timer4Handler(void) 
-{    
-    static int flag = 0;
-    
-    LATDCLR = _LATD_LATD9_MASK;   // Assert SS for SPI2
-    
-    SPI2BUF = SPIword;
-    
-    if (flag > 31)
-    {
-        PR4 = 907;
-        flag = 0;
-    }
-    else
-    {
-        PR4 = 906;
-        flag++;
-    }
-    
-    IFS1CLR = _IFS1_SPI2RXIF_MASK;  // Clear SPI2 interrupt flag
-    IEC1SET = _IEC1_SPI2RXIE_MASK;  // Enable SPI2 interrupt
-    
-    IFS0CLR = _IFS0_T4IF_MASK;  // Clear Timer 4 interrupt flag
-}
-
 void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void) 
 {
     MilliSeconds++;
@@ -161,16 +135,6 @@ void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void)
     IFS0CLR = _IFS0_T1IF_MASK;  // Clear Timer 1 interrupt flag
 }
 
-void __ISR(_SPI_2_VECTOR, ipl3) SPI2Handler(void) 
-{
-    volatile uint32_t junk;
-    
-    junk = SPI2BUF;
-    LATDSET = _LATD_LATD9_MASK;
-    
-    IFS1CLR = _IFS1_SPI2RXIF_MASK;  // Clear SPI2 interrupt flag
-    IEC1CLR = _IEC1_SPI2RXIE_MASK;  // Disable SPI2 interrupt
-}
 
 void __ISR(_SPI_3_VECTOR, ipl1) SPI3Handler(void) 
 {
@@ -310,27 +274,6 @@ bool UART3RxAvailable(void)
 }
 
 
-static void SPI2_begin(const int baud)
-{
-    SPI2BRG = (20000000 / baud) - 1;
-    SPI2CONbits.MSTEN = 1;  // Master mode
-    SPI2CONbits.MODE16 = 1; // 16-bit mode
-    SPI2CONbits.MODE32 = 0;
-    SPI2CONbits.CKE = 1;
-    SPI2CONbits.STXISEL = 0; // Interrupt on Tx complete
-    SPI2CONbits.SRXISEL = 3; // Interrupt on Rx full
-    
-    TRISDbits.TRISD9 = 0;   // RD9 pin 69 as output for SS
-    LATDSET = _LATD_LATD9_MASK;   // De-assert SS for SPI2
-    
-    IPC8bits.SPI2IP = 3;          // SPI2 interrupt priority 3
-    IPC8bits.SPI2IS = 1;          // SPI2 interrupt sub-priority 1
-    IFS1CLR = _IFS1_SPI2TXIF_MASK;  // Clear SPI2 Tx interrupt flag
-    IFS1CLR = _IFS1_SPI2RXIF_MASK;  // Clear SPI2 Rx interrupt flag
-    
-    SPI2CONbits.ON = 1;
-}
-
 static void SPI3_begin(const int baud)
 {    
     SPI3BRG = (20000000 / baud) - 1;
@@ -427,14 +370,14 @@ static void PPS_begin(void)
     RPD0Rbits.RPD0R = 11; // OC2 on pin 72, P3 pin 22 (tone)
     
     /* Configure SPI1 */
-    // SCK1 on pin 70 RD10 - can't use on this PCB
+    // SCK1 on pin 70, RD10 clashes with PMP
     //SDI1Rbits.SDI1R = 0;   // SDI1 on RPD3
     //RPC13Rbits.RPC13R = 8; // SDO1 on RPC13
     
     /* Configure SPI2 */
-    // SCK2 on pin 10, RG6, P1 pin 32
-    SDI2Rbits.SDI2R = 0;   // SDI2 on RPD3, pin 78
-    RPC13Rbits.RPC13R = 6; // SDO2 on RPC13, pin 73
+    // SCK2 on pin 10, RG6 clashes with PMP
+    //SDI2Rbits.SDI2R = 0;   // SDI2 on RPD3, pin 78
+    //RPC13Rbits.RPC13R = 6; // SDO2 on RPC13, pin 73
     
     /* Configure SPI3 */
     // SCK3 on pin 39, RF13, P1 pin 15
@@ -472,7 +415,6 @@ void main(void)
     
     UART3_begin(9600);
     
-    SPI2_begin(2000000);
     SPI3_begin(1000000);
     
     /* Configure Timer 2 for tone generation via PWM */
@@ -513,14 +455,6 @@ void main(void)
     
     T1CONbits.ON = 1;           // Enable Timer 1
     
-    /* Configure Timer 4 */
-    T4CONbits.TCKPS = 0;        // Timer 4 prescale: 1
-    
-    TMR4 = 0x00;                // Clear Timer 4 counter
-    PR4 = 906;                  // Interrupt every 907 ticks (44100Hz)
-    
-    T4CONbits.ON = 1;           // Enable Timer 4
-    
     /* Configure interrupts */
     INTCONSET = _INTCON_MVEC_MASK; // Multi-vector mode
     
@@ -528,11 +462,6 @@ void main(void)
     IPC1bits.T1IS = 1;          // Timer 1 interrupt sub-priority 1
     IFS0CLR = _IFS0_T1IF_MASK;  // Clear Timer 1 interrupt flag
     IEC0SET = _IEC0_T1IE_MASK;  // Enable Timer 1 interrupt
-    
-    IPC4bits.T4IP = 4;          // Timer 4 interrupt priority 4
-    IPC4bits.T4IS = 1;          // Timer 4 interrupt sub-priority 1
-    IFS0CLR = _IFS0_T4IF_MASK;  // Clear Timer 4 interrupt flag
-    IEC0SET = _IEC0_T4IE_MASK;  // Enable Timer 4 interrupt
     
     __asm__("EI");              // Global interrupt enable
     
@@ -544,7 +473,6 @@ void main(void)
         LED1 = 0;
         LED2 = 1;
         
-        SPIword = 0x0000;
         OC1RS = 0;
         toneT2(440);
         SPIwrite(spi, 1);
@@ -594,7 +522,6 @@ void main(void)
         LED1 = 1;
         LED2 = 1;
         
-        SPIword = 0xAA55;
         OC1RS = 128;
         toneT2(0);
         SPIwrite(spi, 8);
@@ -604,7 +531,6 @@ void main(void)
         LED1 = 0;
         LED2 = 0;
         
-        SPIword = 0x55AA;
         OC1RS = 256;
         toneT2(880);
         SPIwrite(hello, sizeof (hello) - 1);
@@ -637,7 +563,6 @@ void main(void)
         LED1 = 1;
         LED2 = 0;
         
-        SPIword = 0xFF00;
         OC1RS = 512;
         toneT2(0);
         
@@ -646,7 +571,6 @@ void main(void)
         LED1 = 1;
         LED2 = 0;
         
-        SPIword = 0xFF00;
         OC1RS = 1023;
         toneT2(440 * 8);
         
