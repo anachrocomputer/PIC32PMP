@@ -91,10 +91,6 @@ static struct UART_BUFFER U3Buf;
 
 volatile uint32_t MilliSeconds = 0;
 
-volatile int SPINbytes = 0;
-volatile uint8_t *SPIBuf = NULL;
-volatile int SPIDummyReads = 0;
-
 
 /* dally --- CPU busy-loop for crude time delay */
 
@@ -133,39 +129,6 @@ void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void)
     LATAINV = _LATA_LATA7_MASK; // Toggle RA7, P3 pin 42 (500Hz)
     
     IFS0CLR = _IFS0_T1IF_MASK;  // Clear Timer 1 interrupt flag
-}
-
-
-void __ISR(_SPI_3_VECTOR, ipl1) SPI3Handler(void) 
-{
-    volatile uint32_t junk;
-    
-    if (IFS2 & _IFS2_SPI3RXIF_MASK)
-    {
-        junk = SPI3BUF;
-        SPIDummyReads--;
-        
-        IFS2CLR = _IFS2_SPI3RXIF_MASK;  // Clear SPI3 Rx interrupt flag
-        
-        if (SPIDummyReads == 0)
-        {
-            LATASET = _LATA_LATA0_MASK;
-
-            IEC2CLR = _IEC2_SPI3RXIE_MASK;  // Disable SPI3 Rx interrupt
-        }
-    }
-    else if (IFS2 & _IFS2_SPI3TXIF_MASK)
-    {
-        SPI3BUF = *SPIBuf++;        // Transmit next byte
-        SPINbytes--;
-        
-        IFS2CLR = _IFS2_SPI3TXIF_MASK;  // Clear SPI3 Tx interrupt flag
-        
-        if (SPINbytes == 0)
-        {
-            IEC2CLR = _IEC2_SPI3TXIE_MASK;  // Disable SPI3 Tx interrupt
-        }
-    }
 }
 
 
@@ -274,71 +237,6 @@ bool UART3RxAvailable(void)
 }
 
 
-static void SPI3_begin(const int baud)
-{    
-    SPI3BRG = (20000000 / baud) - 1;
-    SPI3CONbits.MSTEN = 1;  // Master mode
-    SPI3CONbits.MODE16 = 0; // 8-bit mode
-    SPI3CONbits.MODE32 = 0;
-    SPI3CONbits.CKE = 1;
-    SPI3CONbits.STXISEL = 0; // Interrupt on Tx complete
-    SPI3CONbits.SRXISEL = 3; // Interrupt on Rx full
-    
-    TRISAbits.TRISA0 = 0;   // RA0 pin 17 as output for SS
-    LATASET = _LATA_LATA0_MASK;   // De-assert SS for SPI3
-    
-    IPC12bits.SPI3IP = 1;          // SPI3 interrupt priority 1
-    IPC12bits.SPI3IS = 1;          // SPI3 interrupt sub-priority 1
-    IFS2CLR = _IFS2_SPI3TXIF_MASK;  // Clear SPI3 Tx interrupt flag
-    IFS2CLR = _IFS2_SPI3RXIF_MASK;  // Clear SPI3 Rx interrupt flag
-    
-    SPINbytes = 0;
-    SPIDummyReads = 0;
-    SPIBuf = NULL;
-    
-    SPI3CONbits.ON = 1;
-}
-
-
-bool SPIwrite(uint8_t *buf, const int nbytes)
-{
-    if (SPIDummyReads != 0)     // SPI tranmission still in progress?
-    {
-        return (false);
-    }
-    
-    if ((nbytes <= 0) || (buf == NULL))
-    {
-        return (false);
-    }
-    
-    LATACLR = _LATA_LATA0_MASK;   // Assert SS for SPI3
-    
-    SPIBuf = buf;
-    SPINbytes = nbytes;
-    SPIDummyReads = nbytes;
-    
-    SPI3BUF = *SPIBuf++;          // Transmit first byte
-    SPINbytes--;
-    
-    IFS2CLR = _IFS2_SPI3RXIF_MASK;  // Clear SPI3 Rx interrupt flag
-    IEC2SET = _IEC2_SPI3RXIE_MASK;  // Enable SPI3 Rx interrupt
-    
-    if (SPINbytes > 0)
-    {
-        IFS2CLR = _IFS2_SPI3TXIF_MASK;  // Clear SPI3 Tx interrupt flag
-        IEC2SET = _IEC2_SPI3TXIE_MASK;  // Enable SPI3 Tx interrupt
-    }
-    
-    return (true);
-}
-
-int SPIbytesPending(void)
-{
-    return (SPIDummyReads);
-}
-
-
 /* toneT2 --- generate a tone of the given frequency via Timer 2 and OC2 */
 
 void toneT2(const int freq)
@@ -380,12 +278,12 @@ static void PPS_begin(void)
     //RPC13Rbits.RPC13R = 6; // SDO2 on RPC13, pin 73
     
     /* Configure SPI3 */
-    // SCK3 on pin 39, RF13, P1 pin 15
-    SDI3Rbits.SDI3R = 0;   // SDI3 on RPD2, pin 77
-    RPG8Rbits.RPG8R = 14;  // SDO3 on RPG8, pin 12
+    // SCK3 on pin 39, RF13, P2 pin 39
+    //SDI3Rbits.SDI3R = 0;   // SDI3 on RPD2, pin 77
+    //RPG8Rbits.RPG8R = 14;  // SDO3 on RPG8, pin 12 clashes with PMP
     
     /* Configure SPI4 */
-    // SCK4 on pin 48, RD15 blocked by Main current sense
+    // SCK4 on pin 48, RD15, P2 pin 48
 }
 
 
@@ -401,8 +299,6 @@ static void TRIS_begin(void)
 
 void main(void)
 {
-    static uint8_t spi[32] = {1, 2, 3, 4, 5, 6, 7, 8};
-    static uint8_t hello[] = "Hello, world\r\n";
     char buf[32];
     int i;
     uint8_t ch;
@@ -414,8 +310,6 @@ void main(void)
     TRIS_begin();
     
     UART3_begin(9600);
-    
-    SPI3_begin(1000000);
     
     /* Configure Timer 2 for tone generation via PWM */
     T2CONbits.TCKPS = 6;        // Timer 2 prescale: 64
@@ -475,28 +369,7 @@ void main(void)
         
         OC1RS = 0;
         toneT2(440);
-        SPIwrite(spi, 1);
-        
-        while (SPIbytesPending() > 0)
-            ;
-        
-        SPIwrite(spi, 2);
-        
-        while (SPIbytesPending() > 0)
-            ;
-        
-        SPIwrite(spi, 3);
-        
-        while (SPIbytesPending() > 0)
-            ;
-        
-        SPIwrite(spi, 4);
-        
-        while (SPIbytesPending() > 0)
-            ;
-        
-        SPIwrite(spi, 5);
-        
+
         delayms(500);
         
         
@@ -524,7 +397,6 @@ void main(void)
         
         OC1RS = 128;
         toneT2(0);
-        SPIwrite(spi, 8);
         
         delayms(500);
         
@@ -533,7 +405,6 @@ void main(void)
         
         OC1RS = 256;
         toneT2(880);
-        SPIwrite(hello, sizeof (hello) - 1);
         
         delayms(500);
         
