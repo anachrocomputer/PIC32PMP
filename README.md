@@ -10,6 +10,7 @@ SPI2 sends a 16-bit word every 22.6us (44.1kHz).
 SPI3 sends variable-length packets at certain times in the main loop.
 
 * LED1 RA6, P3 pin 41
+* LED2 RB9, P2 pin 33, P5 or D4
 * Timer toggle at 500Hz RA7, P3 pin 42
 * U3TX RC1 pin 6
 * U3RX RC4 pin 9

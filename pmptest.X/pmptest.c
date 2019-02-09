@@ -51,6 +51,7 @@
 
 
 #define LED1        LATAbits.LATA6
+#define LED2        LATBbits.LATB9
 
 
 #define UART_RX_BUFFER_SIZE  (128)
@@ -451,6 +452,7 @@ static void TRIS_begin(void)
 {
     TRISAbits.TRISA7 = 0;   // RA7 pin 92, P3 pin 42 as output (timer toggle)
     TRISAbits.TRISA6 = 0;   // RA6 pin 91, P3 pin 41 as output (LED1)
+    TRISBbits.TRISB9 = 0;   // RB9 pin 33, P2 pin 33 as output (LED2)
 }
 
 
@@ -540,6 +542,7 @@ void main(void)
     while(1)
     {
         LED1 = 0;
+        LED2 = 1;
         
         SPIword = 0x0000;
         OC1RS = 0;
@@ -589,6 +592,7 @@ void main(void)
         }
         
         LED1 = 1;
+        LED2 = 1;
         
         SPIword = 0xAA55;
         OC1RS = 128;
@@ -598,6 +602,7 @@ void main(void)
         delayms(500);
         
         LED1 = 0;
+        LED2 = 0;
         
         SPIword = 0x55AA;
         OC1RS = 256;
@@ -616,6 +621,7 @@ void main(void)
         UART3TxByte('F');
         
         LED1 = 1;
+        LED2 = 0;
         
         SPIword = 0xFF00;
         OC1RS = 512;
@@ -624,6 +630,7 @@ void main(void)
         delayms(500);
         
         LED1 = 1;
+        LED2 = 0;
         
         SPIword = 0xFF00;
         OC1RS = 1023;
