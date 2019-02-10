@@ -237,6 +237,26 @@ bool UART3RxAvailable(void)
 }
 
 
+static void PMP_begin(void)
+{
+    PMMODEbits.MODE16 = 0;
+    PMMODEbits.WAITB = 3;
+    PMMODEbits.WAITM = 15;
+    PMMODEbits.WAITE = 3;
+    PMMODEbits.MODE = 2;
+    
+    PMCONbits.ADRMUX = 0;
+    PMCONbits.RDSP = 0;
+    PMCONbits.WRSP = 0;
+    PMCONbits.PTRDEN = 1;
+    PMCONbits.PTWREN = 1;
+    
+    PMAENbits.PTEN = 0x03;
+    
+    PMCONbits.ON = 1;
+}
+
+
 /* PPS_begin --- map Peripheral Pin Select to suit dev board */
 
 static void PPS_begin(void)
@@ -278,6 +298,8 @@ static void TRIS_begin(void)
 void main(void)
 {
     uint8_t ch;
+    int i;
+    volatile int junk;
     
     /* Set up peripherals to match pin connections on PCB */
     PPS_begin();
@@ -286,7 +308,9 @@ void main(void)
     TRIS_begin();
     
     UART3_begin(9600);
-            
+    
+    PMP_begin();
+    
     /* Configure Timer 1 */
     T1CONbits.TCKPS = 0;        // Timer 1 prescale: 1
     
@@ -313,6 +337,10 @@ void main(void)
         LED1 = 0;
         LED2 = 1;
         
+        // PMP read cycle
+        PMADDR = 0;
+        junk = PMDIN;
+        
         delayms(500);
         
         
@@ -327,6 +355,17 @@ void main(void)
                
         LED1 = 1;
         LED2 = 1;
+        
+        // PMP write cycles
+        PMADDR = 1;
+        
+        for (i = 0; i < 8; i++)
+        {
+            while (PMMODEbits.BUSY)
+                ;
+            
+            PMDIN = i;
+        }
                 
         delayms(500);
         
