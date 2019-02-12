@@ -122,7 +122,7 @@ static uint32_t millis(void)
 }
 
 
-void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void) 
+void __ISR(_TIMER_1_VECTOR, ipl2AUTO) Timer1Handler(void) 
 {
     MilliSeconds++;
     
@@ -132,7 +132,7 @@ void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void)
 }
 
 
-void __ISR(_UART_3_VECTOR, ipl1) UART3Handler(void) 
+void __ISR(_UART_3_VECTOR, ipl1AUTO) UART3Handler(void) 
 {
     if (IFS2bits.U3TXIF)
     {
@@ -239,21 +239,29 @@ bool UART3RxAvailable(void)
 
 static void PMP_begin(void)
 {
-    PMMODEbits.MODE16 = 0;
-    PMMODEbits.WAITB = 3;
-    PMMODEbits.WAITM = 15;
-    PMMODEbits.WAITE = 3;
-    PMMODEbits.MODE = 2;
+    PMMODEbits.MODE16 = 0;  // 8 data bit mode
+    PMMODEbits.WAITB = 3;   // Setup time wait states
+    PMMODEbits.WAITM = 15;  // Read/write strobe width
+    PMMODEbits.WAITE = 3;   // Hold time wait states
+    PMMODEbits.IRQM = 0;    // No interrupts
+    PMMODEbits.INCM = 0;    // No auto-increment
+    PMMODEbits.MODE = 2;    // /WR and /RD mode (Z80 style bus)
     
-    PMCONbits.ADRMUX = 0;
-    PMCONbits.RDSP = 0;
-    PMCONbits.WRSP = 0;
-    PMCONbits.PTRDEN = 1;
-    PMCONbits.PTWREN = 1;
+    PMCONbits.ADRMUX = 0;   // Non-multiplexed address bus
+    PMCONbits.PTRDEN = 1;   // Enable the PMRD pin
+    PMCONbits.PTWREN = 1;   // Enable the PMWR pin
+    PMCONbits.RDSP = 0;     // PMRD active-LOW
+    PMCONbits.WRSP = 0;     // PMWR active-LOW
+    PMCONbits.CSF = 2;      // PMCS1 and PMCS2 are Chip Select pins
+    PMCONbits.CS1P = 0;     // PMCS1 active-LOW
+    PMCONbits.CS2P = 0;     // PMCS2 active-LOW
     
-    PMAENbits.PTEN = 0x03;
+    PMAENbits.PTEN = 0x03 | (1 << 14) | (1 << 15);
     
-    PMCONbits.ON = 1;
+    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMADDRbits.CS2 = 0;     // PMCS2 inactive
+    
+    PMCONbits.ON = 1;       // Enable the Parallel Master Port module
 }
 
 
@@ -356,16 +364,39 @@ void main(void)
         LED1 = 1;
         LED2 = 1;
         
-        // PMP write cycles
-        PMADDR = 1;
+        // PMP write cycles: four to CS1 and four to CS2
+        PMADDRbits.CS1 = 1;     // PMCS1 active
+        PMADDRbits.CS2 = 0;     // PMCS2 inactive
         
-        for (i = 0; i < 8; i++)
+        for (i = 0; i < 4; i++)
         {
             while (PMMODEbits.BUSY)
                 ;
             
+            PMADDRbits.ADDR = i;
             PMDIN = i;
         }
+        
+        while (PMMODEbits.BUSY)
+                ;
+        
+        PMADDRbits.CS1 = 0;     // PMCS1 inactive
+        PMADDRbits.CS2 = 1;     // PMCS2 active
+        
+        for (i = 0; i < 4; i++)
+        {
+            while (PMMODEbits.BUSY)
+                ;
+            
+            PMADDRbits.ADDR = i;
+            PMDIN = i;
+        }
+        
+        while (PMMODEbits.BUSY)
+                ;
+        
+        PMADDRbits.CS1 = 0;     // PMCS1 inactive
+        PMADDRbits.CS2 = 0;     // PMCS2 inactive
                 
         delayms(500);
         
