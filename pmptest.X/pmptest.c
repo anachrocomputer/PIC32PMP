@@ -308,6 +308,7 @@ void main(void)
     uint8_t ch;
     int i;
     volatile int junk;
+    const char msg[16] = "FARTARSE";
     
     /* Set up peripherals to match pin connections on PCB */
     PPS_begin();
@@ -340,7 +341,7 @@ void main(void)
     UART3TxByte('\r');
     UART3TxByte('\n');
     
-    while(1)
+    while (1)
     {
         LED1 = 0;
         LED2 = 1;
@@ -373,8 +374,8 @@ void main(void)
             while (PMMODEbits.BUSY)
                 ;
             
-            PMADDRbits.ADDR = i;
-            PMDIN = i;
+            PMADDRbits.ADDR = 3 - i;
+            PMDIN = msg[i];
         }
         
         while (PMMODEbits.BUSY)
@@ -388,8 +389,8 @@ void main(void)
             while (PMMODEbits.BUSY)
                 ;
             
-            PMADDRbits.ADDR = i;
-            PMDIN = i;
+            PMADDRbits.ADDR = 3 - i;
+            PMDIN = msg[i + 4];
         }
         
         while (PMMODEbits.BUSY)
