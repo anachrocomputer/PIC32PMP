@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
@@ -237,6 +238,18 @@ bool UART3RxAvailable(void)
 }
 
 
+void _mon_putc(const char ch)
+{
+    // See: https://microchipdeveloper.com/faq:81
+    if (ch == '\n')
+    {
+        UART3TxByte('\r');
+    }
+    
+    UART3TxByte(ch); // Connect stdout to UART3
+}
+
+
 static void PMP_begin(void)
 {
     PMMODEbits.MODE16 = 0;  // 8 data bit mode
@@ -308,7 +321,8 @@ void main(void)
     uint8_t ch;
     int i;
     volatile int junk;
-    const char msg[16] = "FARTARSE";
+    char msg[16];
+    bool flag = false;
     
     /* Set up peripherals to match pin connections on PCB */
     PPS_begin();
@@ -338,8 +352,7 @@ void main(void)
     
     __asm__("EI");              // Global interrupt enable
     
-    UART3TxByte('\r');
-    UART3TxByte('\n');
+    puts("PMPTEST");
     
     while (1)
     {
@@ -364,6 +377,17 @@ void main(void)
                
         LED1 = 1;
         LED2 = 1;
+        
+        if (flag)
+        {
+            strcpy(msg, "FARTARSE");
+        }
+        else
+        {
+            strcpy(msg, "ARSEFART");
+        }
+        
+        flag = !flag;
         
         // PMP write cycles: four to CS1 and four to CS2
         PMADDRbits.CS1 = 1;     // PMCS1 active
@@ -408,25 +432,11 @@ void main(void)
         
         if (PORTAbits.RA1 == 0)
         {
-            UART3TxByte('P');
-            UART3TxByte('R');
-            UART3TxByte('E');
-            UART3TxByte('S');
-            UART3TxByte('S');
-            UART3TxByte('E');
-            UART3TxByte('D');
-            UART3TxByte('!');
+            fputs("PRESSED!", stdout);
         }
         else
         {
-            UART3TxByte('D');
-            UART3TxByte('E');
-            UART3TxByte('A');
-            UART3TxByte('D');
-            UART3TxByte('B');
-            UART3TxByte('E');
-            UART3TxByte('E');
-            UART3TxByte('F');
+            printf("%X", 0xdeadbeef);
         }
         
         LED1 = 1;
