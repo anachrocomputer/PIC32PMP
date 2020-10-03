@@ -250,6 +250,8 @@ void _mon_putc(const char ch)
 }
 
 
+/* PMP_begin --- initialise the Parallel Master Port as an 8-bit Z80-style bus */
+
 static void PMP_begin(void)
 {
     PMMODEbits.MODE16 = 0;  // 8 data bit mode
@@ -261,8 +263,8 @@ static void PMP_begin(void)
     PMMODEbits.MODE = 2;    // /WR and /RD mode (Z80 style bus)
     
     PMCONbits.ADRMUX = 0;   // Non-multiplexed address bus
-    PMCONbits.PTRDEN = 1;   // Enable the PMRD pin
-    PMCONbits.PTWREN = 1;   // Enable the PMWR pin
+    PMCONbits.PTRDEN = 1;   // Enable the PMRD pin (pin 82, P3 pin 32)
+    PMCONbits.PTWREN = 1;   // Enable the PMWR pin (pin 81, P3 pin 31)
     PMCONbits.RDSP = 0;     // PMRD active-LOW
     PMCONbits.WRSP = 0;     // PMWR active-LOW
     PMCONbits.CSF = 2;      // PMCS1 and PMCS2 are Chip Select pins
@@ -271,10 +273,52 @@ static void PMP_begin(void)
     
     PMAENbits.PTEN = 0x03 | (1 << 14) | (1 << 15);
     
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive
-    PMADDRbits.CS2 = 0;     // PMCS2 inactive
+    PMADDRbits.CS1 = 0;     // PMCS1 inactive (pin 71, P3 pin 21)
+    PMADDRbits.CS2 = 0;     // PMCS2 inactive (pin 70, P3 pin 20)
     
     PMCONbits.ON = 1;       // Enable the Parallel Master Port module
+}
+
+
+/* PMP_write8 --- write eight characters to the pair of HMDL-2416 displays */
+
+void PMP_write8(const char msg[])
+{
+    int i;
+    
+    // PMP write cycles: four to CS1 and four to CS2
+    PMADDRbits.CS1 = 1;     // PMCS1 active
+    PMADDRbits.CS2 = 0;     // PMCS2 inactive
+
+    for (i = 0; i < 4; i++)
+    {
+        while (PMMODEbits.BUSY)
+            ;
+
+        PMADDRbits.ADDR = 3 - i;
+        PMDIN = msg[i];
+    }
+
+    while (PMMODEbits.BUSY)
+            ;
+
+    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMADDRbits.CS2 = 1;     // PMCS2 active
+
+    for (i = 0; i < 4; i++)
+    {
+        while (PMMODEbits.BUSY)
+            ;
+
+        PMADDRbits.ADDR = 3 - i;
+        PMDIN = msg[i + 4];
+    }
+
+    while (PMMODEbits.BUSY)
+            ;
+
+    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMADDRbits.CS2 = 0;     // PMCS2 inactive
 }
 
 
@@ -389,39 +433,7 @@ void main(void)
         
         flag = !flag;
         
-        // PMP write cycles: four to CS1 and four to CS2
-        PMADDRbits.CS1 = 1;     // PMCS1 active
-        PMADDRbits.CS2 = 0;     // PMCS2 inactive
-        
-        for (i = 0; i < 4; i++)
-        {
-            while (PMMODEbits.BUSY)
-                ;
-            
-            PMADDRbits.ADDR = 3 - i;
-            PMDIN = msg[i];
-        }
-        
-        while (PMMODEbits.BUSY)
-                ;
-        
-        PMADDRbits.CS1 = 0;     // PMCS1 inactive
-        PMADDRbits.CS2 = 1;     // PMCS2 active
-        
-        for (i = 0; i < 4; i++)
-        {
-            while (PMMODEbits.BUSY)
-                ;
-            
-            PMADDRbits.ADDR = 3 - i;
-            PMDIN = msg[i + 4];
-        }
-        
-        while (PMMODEbits.BUSY)
-                ;
-        
-        PMADDRbits.CS1 = 0;     // PMCS1 inactive
-        PMADDRbits.CS2 = 0;     // PMCS2 inactive
+        PMP_write8(msg);
                 
         delayms(500);
         
