@@ -28,6 +28,38 @@ Sends characters to USART3 depending on SW1 state.
 * PMA0 RB15 pin 44, P2 pin 44
 * PMA1 RB14 pin 43, P2 pin 43
 
+| Signal | Chip  | Name       | Pin | Chip      | Name | Pin |
+|--------|-------|------------|-----|-----------|------|-----|
+| PMWR   | PIC32 | RD4/PMWR   | 81  | HMDL-2416 | /WR  | 6   |
+| PMRD   | PIC32 | RD5/PMRD   | 82  |           |      |     |
+| PMCS1  | PIC32 | RD11/PMCS1 | 71  | HMDL-2416 | /CE1 | 1   |
+| PMCS2  | PIC32 | RD10/PMCS2 | 70  | HMDL-2416 | /CE1 | 1   |
+| PMA0   | PIC32 | RB15/PMA0  | 44  | HMDL-2416 | A0   | 8   |
+| PMA1   | PIC32 | RB14/PMA1  | 43  | HMDL-2416 | A1   | 7   |
+| PMD0   | PIC32 | RE0/PMD0   | 93  | HMDL-2416 | D0   | 11  |
+| PMD1   | PIC32 | RE1/PMD1   | 94  | HMDL-2416 | D1   | 12  |
+| PMD2   | PIC32 | RE2/PMD2   | 98  | HMDL-2416 | D2   | 13  |
+| PMD3   | PIC32 | RE3/PMD3   | 99  | HMDL-2416 | D3   | 14  |
+| PMD4   | PIC32 | RE4/PMD4   | 100 | HMDL-2416 | D4   | 17  |
+| PMD5   | PIC32 | RE5/PMD5   | 3   | HMDL-2416 | D5   | 16  |
+| PMD6   | PIC32 | RE6/PMD6   | 4   | HMDL-2416 | D6   | 15  |
+| PMD7   | PIC32 | RE7/PMD7   | 5   |           |      |     |
+| Vcc    |       |            |     | HMDL-2416 | Vcc  | 9   |
+| Gnd    |       |            |     | HMDL-2416 | Gnd  | 10  |
+| Gnd    |       |            |     | HMDL-2416 | /CE2 | 2   |
+| Gnd    |       |            |     | HMDL-2416 | CUE  | 4   |
+| Vcc    |       |            |     | HMDL-2416 | /CLR | 3   |
+| Vcc    |       |            |     | HMDL-2416 | /CU  | 5   |
+| Vcc    |       |            |     | HMDL-2416 | /BL  | 18  |
+
+Note that we have two HMDL-2416 displays, so PMCS1 goes to the left-hand
+one and PMCS2 goes to the right-hand one.
+The data bus PMD[0-7] and the address bus PMA[0-1] connects to both
+displays in parallel, as does PMWR.
+PMRD is not connected (the displays are write-only) and nor is PMD7
+(they're 7-bit ASCII).
+Some pins on the HMDL-2416 displays are tied HIGH or LOW.
+
 PIC32 pin numbers are for the 100-pin package.
 
 LEDs light when the pin is pulled LOW.
