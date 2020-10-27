@@ -642,13 +642,13 @@ void main(void)
         ili9486_pixMap(8, 8, 8, 8, pixMap);
         
         before = millis();
-        ili9486_fillRect(0, 80, 319 + 32, 319 + 80, ILI9486_ORANGE);
+        ili9486_fillRect(0, 80, 319, 319 + 80, ILI9486_ORANGE);
         after = millis();
         
         ili9486_fillRect(32, 112, 255 + 32, 255 + 112, 0xffff);
-        ili9486_fillRect(64, 144, 192 + 64, 192 + 144, 0xf800);
-        ili9486_fillRect(96, 176, 128 + 96, 128 + 176, 0x07e0);
-        ili9486_fillRect(128, 208, 64 + 128, 64 + 208, 0x001f);
+        ili9486_fillRect(64, 144, 191 + 64, 191 + 144, 0xf800);
+        ili9486_fillRect(96, 176, 127 + 96, 127 + 176, 0x07e0);
+        ili9486_fillRect(128, 208, 63 + 128, 63 + 208, 0x001f);
         printf("\n320x320 pixels took %dms\n", after - before);
                 
         delayms(500);
