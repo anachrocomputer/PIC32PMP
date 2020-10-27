@@ -349,6 +349,8 @@ static void PPS_begin(void)
 }
 
 
+/* iliCmd0 --- send a command byte with no parameter bytes */
+
 void iliCmd0(const uint8_t cmd)
 {
     PMADDRbits.CS1 = 1;     // PMCS1 active
@@ -365,6 +367,8 @@ void iliCmd0(const uint8_t cmd)
     PMADDRbits.CS1 = 0;     // PMCS1 inactive
 }
 
+
+/* iliCmd1 --- send a command byte followed by 1 parameter byte */
 
 void iliCmd1(const uint8_t cmd, const uint8_t arg1)
 {
@@ -388,6 +392,8 @@ void iliCmd1(const uint8_t cmd, const uint8_t arg1)
     PMADDRbits.CS1 = 0;     // PMCS1 inactive
 }
 
+
+/* iliCmd4 --- send a command byte followed by 4 parameter bytes */
 
 void iliCmd4(const uint8_t cmd, const uint8_t arg1, const uint8_t arg2, const uint8_t arg3, const uint8_t arg4)
 {
@@ -426,6 +432,8 @@ void iliCmd4(const uint8_t cmd, const uint8_t arg1, const uint8_t arg2, const ui
     PMADDRbits.CS1 = 0;     // PMCS1 inactive
 }
 
+
+/* iliCmd15 --- send a command byte followed by 15 parameter bytes */
 
 void iliCmd15(const uint8_t cmd, const uint8_t arg[15])
 {
@@ -467,7 +475,7 @@ void ili9486_begin(void)
                                  0x75, 0x37, 0x06, 0x10, 0x03, 0x24, 0x20, 0x00};
     LATDbits.LATD3 = 1;
     delayms(20);
-    LATDbits.LATD3 = 0;
+    LATDbits.LATD3 = 0;     // Assert display RESET, active LOW
     delayms(20);
     LATDbits.LATD3 = 1;
     delayms(20);
@@ -480,7 +488,7 @@ void ili9486_begin(void)
     iliCmd1(ILI9486_POWERCTRL3, 0x44); // Power Control 3 (For Normal Mode)
     iliCmd4(ILI9486_VCOMCTRL1, 0x00, 0x00, 0x00, 0x00); // VCOM Control 1
     iliCmd15(ILI9486_PGAMCTRL, pgamma);   // PGAMCTRL (Positive Gamma Control)
-    iliCmd15(ILI9486_NGAMCTRL, ngamma);   // NGAMCTRL (Negative Gamma Correction)
+    iliCmd15(ILI9486_NGAMCTRL, ngamma);   // NGAMCTRL (Negative Gamma Control)
     iliCmd15(ILI9486_DGAMCTRL1, dgamma);  // Digital Gamma Control 1
     iliCmd1(ILI9486_MEMACCTRL, 0x48);  // Memory Access Control, MX | BGR
     
@@ -489,6 +497,8 @@ void ili9486_begin(void)
     delayms(250);
 }
 
+
+/* ili9486_fill --- fill display memory with a given pixel */
 
 void ili9486_fill(const uint16_t pixel, const uint32_t n)
 {
@@ -523,6 +533,8 @@ void ili9486_fill(const uint16_t pixel, const uint32_t n)
 }
 
 
+/* ili9486_write --- write pixels to the display memory, from a buffer */
+
 void ili9486_write(const uint16_t buf[], const uint32_t n)
 {
     int i;
@@ -535,12 +547,16 @@ void ili9486_write(const uint16_t buf[], const uint32_t n)
     PMADDRbits.ADDR = 0;
     PMDIN = ILI9486_MEMORY_WR;
     
+    while (PMMODEbits.BUSY)
+            ;
+
+    PMADDRbits.ADDR = 1;
+    
     for (i = 0; i < n; i++)
     {
         while (PMMODEbits.BUSY)
             ;
 
-        PMADDRbits.ADDR = 1;
         PMDIN = buf[i];
     }
     
@@ -552,6 +568,8 @@ void ili9486_write(const uint16_t buf[], const uint32_t n)
 }
 
 
+/* ili9486_fillRect --- fill a rectangle at given co-ordinates with a pixel colour */
+
 void ili9486_fillRect(const int x1, const int y1, const int x2, const int y2, const uint16_t colr)
 {
     iliCmd4(ILI9486_COL_ADDR, x1 >> 8, x1, x2 >> 8, x2);
@@ -559,6 +577,8 @@ void ili9486_fillRect(const int x1, const int y1, const int x2, const int y2, co
     ili9486_fill(colr, (1 + x2 - x1) * (1 + y2 - y1));
 }
 
+
+/* ili9486_pixMap --- write pixels to the display memory, in a rectangle */
 
 void ili9486_pixMap(const int x1, const int y1, const int wd, const int ht, const uint16_t *const pixMap)
 {
@@ -586,14 +606,14 @@ static void TRIS_begin(void)
 void main(void)
 {
     unsigned int before, after;
-    static uint16_t pixMap[64] = {0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, // blue
-                                  0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, // blue
-                                  0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, // green
-                                  0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, // green
-                                  0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, // red
-                                  0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, // red
-                                  0xffff, 0xffff, 0xffff, 0xffff, 0x0000, 0x0000, 0x0000, 0x0000, // black/white
-                                  0xffff, 0xffff, 0xffff, 0xffff, 0x0000, 0x0000, 0x0000, 0x0000};
+    static uint16_t pixMap[64] = {0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
+                                  0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
+                                  0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0,  // green
+                                  0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0,  // green
+                                  0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800,  // red
+                                  0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800,  // red
+                                  0xffff, 0x0000, 0xffff, 0x0000, 0xffff, 0x0000, 0xffff, 0x0000,  // black/white
+                                  0x0000, 0xffff, 0x0000, 0xffff, 0x0000, 0xffff, 0x0000, 0xffff}; // black/white
     
     /* Set up peripherals to match pin connections on PCB */
     PPS_begin();
@@ -645,10 +665,10 @@ void main(void)
         ili9486_fillRect(0, 80, 319, 319 + 80, ILI9486_ORANGE);
         after = millis();
         
-        ili9486_fillRect(32, 112, 255 + 32, 255 + 112, 0xffff);
-        ili9486_fillRect(64, 144, 191 + 64, 191 + 144, 0xf800);
-        ili9486_fillRect(96, 176, 127 + 96, 127 + 176, 0x07e0);
-        ili9486_fillRect(128, 208, 63 + 128, 63 + 208, 0x001f);
+        ili9486_fillRect(32, 112, 255 + 32, 255 + 112, ILI9486_WHITE);
+        ili9486_fillRect(64, 144, 191 + 64, 191 + 144, ILI9486_RED);
+        ili9486_fillRect(96, 176, 127 + 96, 127 + 176, ILI9486_GREEN);
+        ili9486_fillRect(128, 208, 63 + 128, 63 + 208, ILI9486_BLUE);
         printf("\n320x320 pixels took %dms\n", after - before);
                 
         delayms(500);
