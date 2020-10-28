@@ -51,6 +51,8 @@
 #include <sys/attribs.h>
 
 
+#include "P1030550_tiny.h"
+
 #define LED1        LATAbits.LATA6
 #define LED2        LATBbits.LATB9
 
@@ -660,6 +662,7 @@ void main(void)
         LED1 = 1;
         LED2 = 1;
         ili9486_pixMap(8, 8, 8, 8, pixMap);
+        ili9486_pixMap((320 - 64) / 2, 8, 64, 64, (const uint16_t *)Image);
         
         before = millis();
         ili9486_fillRect(0, 80, 319, 319 + 80, ILI9486_ORANGE);
