@@ -53,10 +53,19 @@
 // Fonts: Inconsolata
 // convert -resize 32x32\! -font Liberation-Mono +dither -pointsize 144 label:B B.xbm
 
+// PIC32 with 128k RAM: PIC32MX795F512L-80I/PT
+
 #include "P1030550_tiny.h"
 
 #define LED1        LATAbits.LATA6
 #define LED2        LATBbits.LATB9
+
+#define GRAT_HT  (256)
+#define GRAT_WD  (256)
+
+#define GRATICULE (32)
+
+typedef uint16_t iliColr;
 
 // 16-bit 5-6-5 RGB colour definitions
 #define ILI9486_BLACK   (0x0000u)
@@ -99,7 +108,39 @@
 #define ILI9486_DGAMCTRL1   (0xe2)  // DGAMCTRL1 (Digital Gamma Control 1)
 #define ILI9486_DGAMCTRL2   (0xe3)  // DGAMCTRL2 (Digital Gamma Control 2)
 
+#define RGB_ILI(r, g, b)  (((r & 0xf8) << 8) | ((g & 0xfc) << 3) | (b >> 3))
 
+struct ColourScheme {
+  iliColr trace1;
+  iliColr trace2;
+  iliColr xcursor1;
+  iliColr xcursor2;
+  iliColr ycursor1;
+  iliColr ycursor2;
+  iliColr trig;
+  iliColr graticule;
+  iliColr background;
+};
+
+const struct ColourScheme LCDColours = {
+  .trace1 = ILI9486_YELLOW,
+  .trace2 = ILI9486_CYAN,
+  .xcursor1 = ILI9486_WHITE,
+  .xcursor2 = ILI9486_WHITE,
+  .ycursor1 = ILI9486_GREEN,
+  .ycursor2 = ILI9486_GREEN,
+  .trig = ILI9486_ORANGE,
+  .graticule = RGB_ILI(128, 128, 128),
+  .background = ILI9486_BLACK,
+};
+
+iliColr C1grat[GRAT_HT];
+iliColr C2grat[GRAT_HT];
+iliColr Bgrat[GRAT_HT];
+iliColr Dgrat[GRAT_HT];
+iliColr Tgrat[GRAT_HT];
+iliColr Wgrat[GRAT_HT];
+    
 #define UART_RX_BUFFER_SIZE  (128)
 #define UART_RX_BUFFER_MASK (UART_RX_BUFFER_SIZE - 1)
 #if (UART_RX_BUFFER_SIZE & UART_RX_BUFFER_MASK) != 0
@@ -606,10 +647,103 @@ static void TRIS_begin(void)
     TRISDbits.TRISD3 = 0;   // RD3 pin 78, P3 pin 28 as output (LCD RESET)
 }
 
+void generateGraticule(const struct ColourScheme *cp)
+{
+  int y;
+  
+  for (y = 0; y < GRAT_HT; y++) {
+    Wgrat[y] = cp->graticule;
+    
+    if ((y % GRATICULE) == 0)
+      Bgrat[y] = cp->graticule;
+    else
+      Bgrat[y] = cp->background;
+    
+    if ((y % 8) == 0)
+      Dgrat[y] = cp->graticule;
+    else
+      Dgrat[y] = cp->background;
+    
+    if ((y == 1) || (y == ((GRAT_HT / 2) + 1)) || (y == ((GRAT_HT / 2) - 1)) || (y == (GRAT_HT - 2)) || ((y % GRATICULE) == 0))
+      Tgrat[y] = cp->graticule;
+    else
+      Tgrat[y] = cp->background;
+    
+    if ((y % 2) == 0)
+      C1grat[y] = cp->xcursor1;
+    else
+      C1grat[y] = cp->background;
+    
+    if ((y % 2) == 0)
+      C2grat[y] = cp->xcursor2;
+    else
+      C2grat[y] = cp->background;
+   }
+}
+
+void interpolateY(const uint8_t wave[], const int x, iliColr pixels[], const iliColr colr)
+{
+  int y1, y2;
+  int y;
+  
+  y1 = wave[x];
+
+  if (x < (GRAT_WD - 1))
+    y2 = wave[x + 1];
+  else
+    y2 = y1;
+
+  if ((y1 > 0) && (y1 < GRAT_HT)) {
+    if (y2 < y1) {
+      y = y1;
+      y1 = y2;
+      y2 = y;
+    }
+    
+    for (y = y1; y <= y2; y++)
+      pixels[y] = colr;
+  }
+}
+
+void interpolateY2(const uint8_t wave[], const int x, const int yoff, iliColr pixels[], const iliColr colr)
+{
+  int y1, y2;
+  int y;
+  
+  y1 = wave[x] + yoff;
+
+  if (x < (GRAT_WD - 1))
+    y2 = wave[x + 1] + yoff;
+  else
+    y2 = y1;
+
+  if ((y1 > 0) && (y1 < GRAT_HT) && (y2 > 0) && (y2 < GRAT_HT)) {
+    if (y2 < y1) {
+      y = y1;
+      y1 = y2;
+      y2 = y;
+    }
+    
+    for (y = y1; y <= y2; y++)
+      pixels[y] = colr;
+  }
+}
 
 void main(void)
 {
     unsigned int before, after;
+    int x;
+    iliColr pixels[GRAT_HT];
+    uint8_t wave1[GRAT_WD];
+    uint8_t wave2[GRAT_WD];
+    float theta1, delta1;
+    float theta2, delta2;
+    float offset1 = 128.0;
+    float offset2 = 180.0;
+    bool cursorMode = true;
+    int xcursor1 = 34, xcursor2 = 241;
+    int ycursor1 = 54, ycursor2 = 237;
+    int yshift1 = 22;
     static uint16_t pixMap[64] = {0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
                                   0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
                                   0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0,  // green
@@ -650,6 +784,21 @@ void main(void)
     puts("ILI9486TEST");
     
     ili9486_begin();
+    
+    generateGraticule(&LCDColours);
+    
+    // Synthesise two dummy waveforms
+    delta1 = (M_PI * 4.0) / (float)GRAT_WD;
+    delta2 = (M_PI * 8.0) / (float)GRAT_WD;
+
+    for (x = 0; x < GRAT_WD; x++) {
+        theta1 = (float)x * delta1;
+        theta2 = (float)x * delta2;
+
+        wave1[x] = (sin(theta1) * 50.0) + offset1;
+        wave2[x] = (sin(theta2) * 50.0) + offset2;
+    }
+   
     
     ili9486_fill(ILI9486_WHITE, 480u * 320u);
     
@@ -695,6 +844,41 @@ void main(void)
         
         LED1 = 1;
         LED2 = 0;
+        
+        before = millis();
+        
+        for (x = 0; x < GRAT_WD; x++)
+        {
+            // Draw the graticule, cursors or background
+            if ((cursorMode == true) && (x == xcursor1))
+              memcpy(pixels, C1grat, sizeof (pixels));
+            else if ((cursorMode == true) && (x == xcursor2))
+              memcpy(pixels, C2grat, sizeof (pixels));
+            else if ((x == 1) || (x == ((GRAT_WD / 2) + 1)) || (x == ((GRAT_WD / 2) - 1)) || (x == (GRAT_WD - 2)))
+              memcpy(pixels, Dgrat, sizeof (pixels));
+            else if ((x % GRATICULE) == 0)
+              memcpy(pixels, Wgrat, sizeof (pixels));
+            else if ((x % 8) == 0)
+              memcpy(pixels, Tgrat, sizeof (pixels));
+            else
+              memcpy(pixels, Bgrat, sizeof (pixels));
+            
+            // Add two Y-cursors
+            if ((cursorMode == true) && ((x % 2) == 0)) {
+              pixels[ycursor1] = LCDColours.ycursor1;
+              pixels[ycursor2] = LCDColours.ycursor2;
+            }
+            
+            // Add the two waveforms
+            interpolateY2(wave1, x, yshift1, pixels, LCDColours.trace1);
+            interpolateY(wave2, x, pixels, LCDColours.trace2);
+        
+            ili9486_pixMap(x + 32, 112, 1, GRAT_HT, pixels);
+        }
+        
+        after = millis();
+        printf("\n%dx%d scope display took %dms\n", GRAT_WD, GRAT_HT, after - before);
+        
         ili9486_fillRect(0, 0, 319, 0, ILI9486_GREEN);
         
         delayms(500);
