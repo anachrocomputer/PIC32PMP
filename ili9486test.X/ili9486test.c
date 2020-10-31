@@ -50,6 +50,8 @@
 #include <xc.h>
 #include <sys/attribs.h>
 
+// Fonts: Inconsolata
+// convert -resize 32x32\! -font Liberation-Mono +dither -pointsize 144 label:B B.xbm
 
 #include "P1030550_tiny.h"
 
@@ -298,9 +300,9 @@ void _mon_putc(const char ch)
 static void PMP_begin(void)
 {
     PMMODEbits.MODE16 = 1;  // 16 data bit mode
-    PMMODEbits.WAITB = 2;   // Setup time wait states
-    PMMODEbits.WAITM = 8;   // Read/write strobe width
-    PMMODEbits.WAITE = 2;   // Hold time wait states
+    PMMODEbits.WAITB = 0;   // Setup time wait states
+    PMMODEbits.WAITM = 0;   // Read/write strobe width
+    PMMODEbits.WAITE = 0;   // Hold time wait states
     PMMODEbits.IRQM = 0;    // No interrupts
     PMMODEbits.INCM = 0;    // No auto-increment
     PMMODEbits.MODE = 2;    // /WR and /RD mode (Z80 style bus)
