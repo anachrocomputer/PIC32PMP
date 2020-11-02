@@ -113,6 +113,8 @@ typedef uint16_t iliColr;
 struct ColourScheme {
     iliColr trace1;
     iliColr trace2;
+    iliColr trace3;
+    iliColr trace4;
     iliColr xcursor1;
     iliColr xcursor2;
     iliColr ycursor1;
@@ -125,6 +127,8 @@ struct ColourScheme {
 const struct ColourScheme LCDColours = {
     .trace1 = ILI9486_YELLOW,
     .trace2 = ILI9486_CYAN,
+    .trace3 = ILI9486_MAGENTA,
+    .trace4 = ILI9486_BLUE,
     .xcursor1 = ILI9486_WHITE,
     .xcursor2 = ILI9486_WHITE,
     .ycursor1 = ILI9486_GREEN,
@@ -722,6 +726,8 @@ void main(void)
     iliColr pixels[GRAT_HT];
     uint8_t wave1[GRAT_WD];
     uint8_t wave2[GRAT_WD];
+    uint8_t wave3[GRAT_WD];
+    uint8_t wave4[GRAT_WD];
     float theta1, delta1;
     float theta2, delta2;
     float offset1 = 128.0;
@@ -731,6 +737,8 @@ void main(void)
     int ycursor1 = 54, ycursor2 = 237;
     int yshift1 = 22;
     int yshift2 = -22;
+    int yshift3 = 64;
+    int yshift4 = 32;
     static uint16_t pixMap[64] = {0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
                                   0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
                                   0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0,  // green
@@ -774,7 +782,7 @@ void main(void)
     
     generateGraticule(&LCDColours);
     
-    // Synthesise two dummy waveforms
+    // Synthesise four dummy waveforms
     delta1 = (M_PI * 4.0) / (float)GRAT_WD;
     delta2 = (M_PI * 8.0) / (float)GRAT_WD;
 
@@ -784,6 +792,8 @@ void main(void)
 
         wave1[x] = (sin(theta1) * 50.0) + offset1;
         wave2[x] = (sin(theta2) * 50.0) + offset2;
+        wave3[x] = sin(theta1) > 0.0? 32: 0;
+        wave4[x] = sin(theta2) > 0.0? 32: 0;
     }
    
     
@@ -832,7 +842,7 @@ void main(void)
         
         for (x = 0; x < GRAT_WD; x++)
         {
-            ili9486_pixMap(x + 32, 112, 1, GRAT_HT, pixels);
+            ili9486_pixMap(x + ((320 - GRAT_WD) / 2), (480 - GRAT_HT) / 2, 1, GRAT_HT, pixels);
         }
         
         after = millis();
@@ -876,11 +886,13 @@ void main(void)
                 pixels[ycursor2] = LCDColours.ycursor2;
             }
             
-            // Add the two waveforms
+            // Add the four waveforms
             interpolateY(wave1, x, yshift1, pixels, LCDColours.trace1);
             interpolateY(wave2, x, yshift2, pixels, LCDColours.trace2);
+            interpolateY(wave3, x, yshift3, pixels, LCDColours.trace3);
+            interpolateY(wave4, x, yshift4, pixels, LCDColours.trace4);
         
-            ili9486_pixMap(x + 32, 112, 1, GRAT_HT, pixels);
+            ili9486_pixMap(x + ((320 - GRAT_WD) / 2), (480 - GRAT_HT) / 2, 1, GRAT_HT, pixels);
         }
         
         after = millis();
