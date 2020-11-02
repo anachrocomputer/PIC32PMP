@@ -111,27 +111,27 @@ typedef uint16_t iliColr;
 #define RGB_ILI(r, g, b)  (((r & 0xf8) << 8) | ((g & 0xfc) << 3) | (b >> 3))
 
 struct ColourScheme {
-  iliColr trace1;
-  iliColr trace2;
-  iliColr xcursor1;
-  iliColr xcursor2;
-  iliColr ycursor1;
-  iliColr ycursor2;
-  iliColr trig;
-  iliColr graticule;
-  iliColr background;
+    iliColr trace1;
+    iliColr trace2;
+    iliColr xcursor1;
+    iliColr xcursor2;
+    iliColr ycursor1;
+    iliColr ycursor2;
+    iliColr trig;
+    iliColr graticule;
+    iliColr background;
 };
 
 const struct ColourScheme LCDColours = {
-  .trace1 = ILI9486_YELLOW,
-  .trace2 = ILI9486_CYAN,
-  .xcursor1 = ILI9486_WHITE,
-  .xcursor2 = ILI9486_WHITE,
-  .ycursor1 = ILI9486_GREEN,
-  .ycursor2 = ILI9486_GREEN,
-  .trig = ILI9486_ORANGE,
-  .graticule = RGB_ILI(128, 128, 128),
-  .background = ILI9486_BLACK,
+    .trace1 = ILI9486_YELLOW,
+    .trace2 = ILI9486_CYAN,
+    .xcursor1 = ILI9486_WHITE,
+    .xcursor2 = ILI9486_WHITE,
+    .ycursor1 = ILI9486_GREEN,
+    .ycursor2 = ILI9486_GREEN,
+    .trig = ILI9486_ORANGE,
+    .graticule = RGB_ILI(128, 128, 128),
+    .background = ILI9486_BLACK,
 };
 
 iliColr C1grat[GRAT_HT];
@@ -652,86 +652,67 @@ static void TRIS_begin(void)
     TRISDbits.TRISD3 = 0;   // RD3 pin 78, P3 pin 28 as output (LCD RESET)
 }
 
+
 void generateGraticule(const struct ColourScheme *cp)
 {
-  int y;
-  
-  for (y = 0; y < GRAT_HT; y++) {
-    Wgrat[y] = cp->graticule;
-    
-    if ((y % GRATICULE) == 0)
-      Bgrat[y] = cp->graticule;
-    else
-      Bgrat[y] = cp->background;
-    
-    if ((y % 8) == 0)
-      Dgrat[y] = cp->graticule;
-    else
-      Dgrat[y] = cp->background;
-    
-    if ((y == 1) || (y == ((GRAT_HT / 2) + 1)) || (y == ((GRAT_HT / 2) - 1)) || (y == (GRAT_HT - 2)) || ((y % GRATICULE) == 0))
-      Tgrat[y] = cp->graticule;
-    else
-      Tgrat[y] = cp->background;
-    
-    if ((y % 2) == 0)
-      C1grat[y] = cp->xcursor1;
-    else
-      C1grat[y] = cp->background;
-    
-    if ((y % 2) == 0)
-      C2grat[y] = cp->xcursor2;
-    else
-      C2grat[y] = cp->background;
-   }
+    int y;
+
+    for (y = 0; y < GRAT_HT; y++)
+    {
+        Wgrat[y] = cp->graticule;
+
+        if ((y % GRATICULE) == 0)
+            Bgrat[y] = cp->graticule;
+        else
+            Bgrat[y] = cp->background;
+
+        if ((y % 8) == 0)
+            Dgrat[y] = cp->graticule;
+        else
+            Dgrat[y] = cp->background;
+
+        if ((y == 1) || (y == ((GRAT_HT / 2) + 1)) || (y == ((GRAT_HT / 2) - 1)) || (y == (GRAT_HT - 2)) || ((y % GRATICULE) == 0))
+            Tgrat[y] = cp->graticule;
+        else
+            Tgrat[y] = cp->background;
+
+        if ((y % 2) == 0)
+            C1grat[y] = cp->xcursor1;
+        else
+            C1grat[y] = cp->background;
+
+        if ((y % 2) == 0)
+            C2grat[y] = cp->xcursor2;
+        else
+            C2grat[y] = cp->background;
+    }
 }
 
-void interpolateY(const uint8_t wave[], const int x, iliColr pixels[], const iliColr colr)
+
+void interpolateY(const uint8_t wave[], const int x, const int yoff, iliColr pixels[], const iliColr colr)
 {
-  int y1, y2;
-  int y;
-  
-  y1 = wave[x];
+    int y1, y2;
+    int y;
 
-  if (x < (GRAT_WD - 1))
-    y2 = wave[x + 1];
-  else
-    y2 = y1;
+    y1 = wave[x] + yoff;
 
-  if ((y1 > 0) && (y1 < GRAT_HT)) {
-    if (y2 < y1) {
-      y = y1;
-      y1 = y2;
-      y2 = y;
+    if (x < (GRAT_WD - 1))
+        y2 = wave[x + 1] + yoff;
+    else
+        y2 = y1;
+
+    if ((y1 > 0) && (y1 < GRAT_HT) && (y2 > 0) && (y2 < GRAT_HT))
+    {
+        if (y2 < y1)
+        {
+            y = y1;
+            y1 = y2;
+            y2 = y;
+        }
+
+        for (y = y1; y <= y2; y++)
+            pixels[y] = colr;
     }
-    
-    for (y = y1; y <= y2; y++)
-      pixels[y] = colr;
-  }
-}
-
-void interpolateY2(const uint8_t wave[], const int x, const int yoff, iliColr pixels[], const iliColr colr)
-{
-  int y1, y2;
-  int y;
-  
-  y1 = wave[x] + yoff;
-
-  if (x < (GRAT_WD - 1))
-    y2 = wave[x + 1] + yoff;
-  else
-    y2 = y1;
-
-  if ((y1 > 0) && (y1 < GRAT_HT) && (y2 > 0) && (y2 < GRAT_HT)) {
-    if (y2 < y1) {
-      y = y1;
-      y1 = y2;
-      y2 = y;
-    }
-    
-    for (y = y1; y <= y2; y++)
-      pixels[y] = colr;
-  }
 }
 
 void main(void)
@@ -744,11 +725,12 @@ void main(void)
     float theta1, delta1;
     float theta2, delta2;
     float offset1 = 128.0;
-    float offset2 = 180.0;
+    float offset2 = 192.0;
     bool cursorMode = true;
     int xcursor1 = 34, xcursor2 = 241;
     int ycursor1 = 54, ycursor2 = 237;
     int yshift1 = 22;
+    int yshift2 = -22;
     static uint16_t pixMap[64] = {0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
                                   0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
                                   0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0,  // green
@@ -876,27 +858,27 @@ void main(void)
         {
             // Draw the graticule, cursors or background
             if ((cursorMode == true) && (x == xcursor1))
-              memcpy(pixels, C1grat, sizeof (pixels));
+                memcpy(pixels, C1grat, sizeof (pixels));
             else if ((cursorMode == true) && (x == xcursor2))
-              memcpy(pixels, C2grat, sizeof (pixels));
+                memcpy(pixels, C2grat, sizeof (pixels));
             else if ((x == 1) || (x == ((GRAT_WD / 2) + 1)) || (x == ((GRAT_WD / 2) - 1)) || (x == (GRAT_WD - 2)))
-              memcpy(pixels, Dgrat, sizeof (pixels));
+                memcpy(pixels, Dgrat, sizeof (pixels));
             else if ((x % GRATICULE) == 0)
-              memcpy(pixels, Wgrat, sizeof (pixels));
+                memcpy(pixels, Wgrat, sizeof (pixels));
             else if ((x % 8) == 0)
-              memcpy(pixels, Tgrat, sizeof (pixels));
+                memcpy(pixels, Tgrat, sizeof (pixels));
             else
-              memcpy(pixels, Bgrat, sizeof (pixels));
+                memcpy(pixels, Bgrat, sizeof (pixels));
             
             // Add two Y-cursors
             if ((cursorMode == true) && ((x % 2) == 0)) {
-              pixels[ycursor1] = LCDColours.ycursor1;
-              pixels[ycursor2] = LCDColours.ycursor2;
+                pixels[ycursor1] = LCDColours.ycursor1;
+                pixels[ycursor2] = LCDColours.ycursor2;
             }
             
             // Add the two waveforms
-            interpolateY2(wave1, x, yshift1, pixels, LCDColours.trace1);
-            interpolateY(wave2, x, pixels, LCDColours.trace2);
+            interpolateY(wave1, x, yshift1, pixels, LCDColours.trace1);
+            interpolateY(wave2, x, yshift2, pixels, LCDColours.trace2);
         
             ili9486_pixMap(x + 32, 112, 1, GRAT_HT, pixels);
         }
