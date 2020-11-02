@@ -472,7 +472,7 @@ void iliCmd4(const uint8_t cmd, const uint8_t arg1, const uint8_t arg2, const ui
     PMDIN = arg4;
     
     while (PMMODEbits.BUSY)
-            ;
+        ;
 
     PMADDRbits.CS1 = 0;     // PMCS1 inactive
 }
@@ -583,6 +583,7 @@ void ili9486_fill(const uint16_t pixel, const uint32_t n)
 void ili9486_write(const uint16_t buf[], const uint32_t n)
 {
     int i;
+    const uint16_t *p = buf;
     
     PMADDRbits.CS1 = 1;     // PMCS1 active
     
@@ -599,10 +600,14 @@ void ili9486_write(const uint16_t buf[], const uint32_t n)
     
     for (i = 0; i < n; i++)
     {
+        // Pre-fetch pixel and inc pointer. This happens in parallel with the
+        // 'busy' time of the PMP, making this tight loop go just a bit faster.
+        const uint16_t pixel = *p++;
+        
         while (PMMODEbits.BUSY)
             ;
 
-        PMDIN = buf[i];
+        PMDIN = pixel;
     }
     
     while (PMMODEbits.BUSY)
@@ -815,21 +820,41 @@ void main(void)
         ili9486_pixMap(8, 8, 8, 8, pixMap);
         ili9486_pixMap((320 - 64) / 2, 8, 64, 64, (const uint16_t *)Image);
         
-        before = millis();
         ili9486_fillRect(0, 80, 319, 319 + 80, ILI9486_ORANGE);
-        after = millis();
         
+        before = millis();
         ili9486_fillRect(32, 112, 255 + 32, 255 + 112, ILI9486_WHITE);
+        after = millis();
         ili9486_fillRect(64, 144, 191 + 64, 191 + 144, ILI9486_RED);
         ili9486_fillRect(96, 176, 127 + 96, 127 + 176, ILI9486_GREEN);
         ili9486_fillRect(128, 208, 63 + 128, 63 + 208, ILI9486_BLUE);
-        printf("\n320x320 pixels took %dms\n", after - before);
+        printf("\n256x256 pixels took %dms\n", after - before);
                 
         delayms(500);
         
         LED1 = 0;
         LED2 = 0;
         ili9486_fillRect(0, 0, 319, 0, ILI9486_MAGENTA);
+        
+        before = millis();
+        
+        for (x = 0; x < GRAT_WD; x++)
+        {
+            memcpy(pixels, C1grat, sizeof (pixels));
+        }
+        
+        after = millis();
+        printf("\n%dx%d byte memcpy() took %dms\n", GRAT_WD, sizeof (pixels), after - before);
+        
+        before = millis();
+        
+        for (x = 0; x < GRAT_WD; x++)
+        {
+            ili9486_pixMap(x + 32, 112, 1, GRAT_HT, pixels);
+        }
+        
+        after = millis();
+        printf("\n%dx%d ili9486_pixMap() took %dms\n", GRAT_WD, GRAT_HT, after - before);
         
         delayms(500);
         
