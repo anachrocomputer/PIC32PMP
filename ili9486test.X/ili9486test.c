@@ -602,11 +602,32 @@ void ili9486_write(const uint16_t buf[], const uint32_t n)
 
     PMADDRbits.ADDR = 1;
     
-    for (i = 0; i < n; i++)
+    for (i = n / 4; i > 0; i--)
     {
         // Pre-fetch pixel and inc pointer. This happens in parallel with the
         // 'busy' time of the PMP, making this tight loop go just a bit faster.
-        const uint16_t pixel = *p++;
+        uint16_t pixel = *p++;
+        
+        while (PMMODEbits.BUSY)
+            ;
+
+        PMDIN = pixel;
+        
+        pixel = *p++;
+        
+        while (PMMODEbits.BUSY)
+            ;
+
+        PMDIN = pixel;
+        
+        pixel = *p++;
+        
+        while (PMMODEbits.BUSY)
+            ;
+
+        PMDIN = pixel;
+        
+        pixel = *p++;
         
         while (PMMODEbits.BUSY)
             ;
@@ -786,7 +807,8 @@ void main(void)
     delta1 = (M_PI * 4.0) / (float)GRAT_WD;
     delta2 = (M_PI * 8.0) / (float)GRAT_WD;
 
-    for (x = 0; x < GRAT_WD; x++) {
+    for (x = 0; x < GRAT_WD; x++)
+    {
         theta1 = (float)x * delta1;
         theta2 = (float)x * delta2;
 
