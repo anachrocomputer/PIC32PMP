@@ -56,6 +56,7 @@
 // PIC32 with 128k RAM: PIC32MX795F512L-80I/PT
 
 #include "P1030550_tiny.h"
+#include "CHGUK01.h"
 
 #define LED1        LATAbits.LATA6
 #define LED2        LATBbits.LATB9
@@ -562,7 +563,7 @@ void ili9486_fill(const uint16_t pixel, const uint32_t n)
     PMDIN = ILI9486_MEMORY_WR;
     
     while (PMMODEbits.BUSY)
-        ;        
+        ;
     
     PMADDRbits.ADDR = 1;
     
@@ -575,7 +576,7 @@ void ili9486_fill(const uint16_t pixel, const uint32_t n)
     }
     
     while (PMMODEbits.BUSY)
-            ;
+        ;
 
     PMADDRbits.CS1 = 0;     // PMCS1 inactive
     PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
@@ -598,7 +599,7 @@ void ili9486_write(const uint16_t buf[], const uint32_t n)
     PMDIN = ILI9486_MEMORY_WR;
     
     while (PMMODEbits.BUSY)
-            ;
+        ;
 
     PMADDRbits.ADDR = 1;
     
@@ -636,7 +637,7 @@ void ili9486_write(const uint16_t buf[], const uint32_t n)
     }
     
     while (PMMODEbits.BUSY)
-            ;
+        ;
 
     PMADDRbits.CS1 = 0;     // PMCS1 inactive
     PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
@@ -740,10 +741,74 @@ void interpolateY(const uint8_t wave[], const int x, const int yoff, iliColr pix
     }
 }
 
+
+void ili9486_renderFont(const int x1, const int y1, const iliColr fg, const iliColr bg, const uint8_t *const str)
+{
+    const int len = strlen(str);
+    const int wd = len * 8;
+    const int ht = 8;
+    const int x2 = x1 + wd - 1;
+    const int y2 = y1 + ht - 1;
+    int i, row, col;
+    uint8_t bits, mask;
+    iliColr pixel;
+    
+    iliCmd4(ILI9486_COL_ADDR, x1 >> 8, x1, x2 >> 8, x2);
+    iliCmd4(ILI9486_PAGE_ADDR, y1 >> 8, y1, y2 >> 8, y2);
+    
+    PMADDRbits.CS1 = 1;     // PMCS1 active
+    
+    while (PMMODEbits.BUSY)
+        ;
+    
+    PMADDRbits.ADDR = 0;
+    PMDIN = ILI9486_MEMORY_WR;
+    
+    while (PMMODEbits.BUSY)
+        ;
+    
+    PMADDRbits.ADDR = 1;
+    
+    for (row = 0; row < 8; row++)
+    {
+        for (i = 0; i < len; i++)
+        {
+            bits = TileGlyph[str[i]][row];
+            
+            for (col = 0; col < 8; col++)
+            {
+                mask = 0x80 >> col;
+                
+                if (mask & bits)
+                {
+                    pixel = fg;
+                }
+                else
+                {
+                    pixel = bg;
+                }
+                
+                while (PMMODEbits.BUSY)
+                    ;
+
+                PMDIN = pixel;
+            }
+        }
+    }
+    
+    while (PMMODEbits.BUSY)
+        ;
+
+    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
+}
+
+
 void main(void)
 {
     unsigned int before, after;
-    int x;
+    int x, y;
+    uint8_t str[32];
     iliColr pixels[GRAT_HT];
     uint8_t wave1[GRAT_WD];
     uint8_t wave2[GRAT_WD];
@@ -927,6 +992,28 @@ void main(void)
         LED1 = 1;
         LED2 = 0;
         ili9486_fillRect(0, 0, 319, 0, ILI9486_ORANGE);
+        
+        before = millis();
+        
+        for (y = 0; y < 16; y++)
+        {
+            for (x = 0; x < 16; x++)
+            {
+                uint8_t ch = (y * 16) + x;
+                
+                if (ch == 0)
+                    ch = ' ';
+                
+                str[x] = ch;
+            }
+            
+            str[16] = '\0';
+            
+            ili9486_renderFont((320 - (16 * 8)) / 2, (y * 8) + ((480 - (16 * 8)) / 2), ILI9486_GREEN, ILI9486_BLACK, str);
+        }
+        
+        after = millis();
+        printf("\n%dx%d characters took %dms\n", 16, 16, after - before);
         
         delayms(500);
     }
