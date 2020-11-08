@@ -58,11 +58,17 @@
 #include "P1030550_tiny.h"
 #include "CHGUK01.h"
 
+#define FONT_WD (8)
+#define FONT_HT (8)
+
 #define LED1        LATAbits.LATA6
 #define LED2        LATBbits.LATB9
 
 #define GRAT_HT  (256)
 #define GRAT_WD  (256)
+
+#define XMAG   (2)  // For full UK101 effect, set this to 1
+#define YMAG   (2)
 
 #define GRATICULE (32)
 
@@ -829,8 +835,8 @@ void interpolateY(const uint8_t wave[], const int x, const int yoff, iliColr pix
 void ili9486_renderFont(const int x1, const int y1, const iliColr fg, const iliColr bg, const uint8_t *const str)
 {
     const int len = strlen(str);
-    const int wd = len * 8;
-    const int ht = 8;
+    const int wd = len * FONT_WD;
+    const int ht = FONT_HT;
     const int x2 = x1 + wd - 1;
     const int y2 = y1 + ht - 1;
     int i, row, col;
@@ -853,13 +859,13 @@ void ili9486_renderFont(const int x1, const int y1, const iliColr fg, const iliC
     
     PMADDRbits.ADDR = 1;
     
-    for (row = 0; row < 8; row++)
+    for (row = 0; row < FONT_HT; row++)
     {
         for (i = 0; i < len; i++)
         {
             bits = TileGlyph[str[i]][row];
             
-            for (col = 0; col < 8; col++)
+            for (col = 0; col < FONT_WD; col++)
             {
                 mask = 0x80 >> col;
                 
@@ -884,6 +890,75 @@ void ili9486_renderFont(const int x1, const int y1, const iliColr fg, const iliC
         ;
 
     PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
+}
+
+
+void ili9486_renderScaledFont(const int x1, const int y1, const int xmag, const int ymag, const iliColr fg, const iliColr bg, const uint8_t * const str)
+{
+    const int len = strlen(str);
+    const int wd = len * FONT_WD * xmag;
+    const int ht = FONT_HT * ymag;
+    const int x2 = x1 + wd - 1;
+    const int y2 = y1 + ht - 1;
+    int i, row, col;
+    int x, y;
+    uint8_t bits, mask;
+    iliColr pixel;
+
+    iliCmd4(ILI9486_COL_ADDR, x1 >> 8, x1, x2 >> 8, x2);
+    iliCmd4(ILI9486_PAGE_ADDR, y1 >> 8, y1, y2 >> 8, y2);
+
+    PMADDRbits.CS1 = 1; // PMCS1 active
+
+    while (PMMODEbits.BUSY)
+        ;
+
+    PMADDRbits.ADDR = 0;
+    PMDIN = ILI9486_MEMORY_WR;
+
+    while (PMMODEbits.BUSY)
+        ;
+
+    PMADDRbits.ADDR = 1;
+
+    for (row = 0; row < FONT_HT; row++)
+    {
+        for (y = 0; y < ymag; y++)
+        {
+            for (i = 0; i < len; i++)
+            {
+                bits = TileGlyph[str[i]][row];
+
+                for (col = 0; col < FONT_WD; col++)
+                {
+                    mask = 0x80 >> col;
+
+                    if (mask & bits)
+                    {
+                        pixel = fg;
+                    }
+                    else
+                    {
+                        pixel = bg;
+                    }
+
+                    for (x = 0; x < xmag; x++)
+                    {
+                        while (PMMODEbits.BUSY)
+                            ;
+
+                        PMDIN = pixel;
+                    }
+                }
+            }
+        }
+    }
+
+    while (PMMODEbits.BUSY)
+        ;
+
+    PMADDRbits.CS1 = 0; // PMCS1 inactive
     PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
 }
 
@@ -1098,7 +1173,7 @@ void main(void)
             
             str[16] = '\0';
             
-            ili9486_renderFont((320 - (16 * 8)) / 2, (y * 8) + ((480 - (16 * 8)) / 2), ILI9486_BLACK, hsvto565(y * 16, MAXPRI, MAXPRI), str);
+            ili9486_renderScaledFont((320 - (16 * FONT_WD * XMAG)) / 2, (y * FONT_HT * YMAG) + ((480 - (16 * FONT_HT * YMAG)) / 2), XMAG, YMAG, ILI9486_BLACK, hsvto565(y * 16, MAXPRI, MAXPRI), str);
         }
         
         after = millis();
