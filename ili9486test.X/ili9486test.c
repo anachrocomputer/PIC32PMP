@@ -66,6 +66,8 @@
 
 #define GRATICULE (32)
 
+#define MAXPRI    (255)
+
 typedef uint16_t iliColr;
 
 // 16-bit 5-6-5 RGB colour definitions
@@ -667,6 +669,88 @@ void ili9486_pixMap(const int x1, const int y1, const int wd, const int ht, cons
 }
 
 
+
+/* hsvto565 --- convert HSV colour to 565-RGB */
+
+iliColr hsvto565(const int ih, const int is, const int iv)
+{
+    int i;
+    uint8_t ir, ig, ib;
+    iliColr rgb565;
+    double p, q, t;
+    double f;
+    double h, s, v;
+    double r = 0.0, g = 0.0, b = 0.0;
+
+    // Compute H, S, V as floating-point in range 0..360, 0..1 and 0..1
+    h = (double)ih * (360.0 / (double)MAXPRI);
+    s = is / (double)MAXPRI;
+    v = iv / (double)MAXPRI;
+
+    if (is == 0)    /* No saturation so make a grey */
+    {
+        ir = iv;
+        ig = iv;
+        ib = iv;
+    }
+    else
+    {
+        if (h >= 359.0)
+            h = 0.0;
+
+        h /= 60.0;
+        i = (int)h;
+        f = h - i;
+
+        p = v * (1.0 - s);
+        q = v * (1.0 - (s * f));
+        t = v * (1.0 - (s * (1.0 - f)));
+
+        switch (i)
+        {
+        case 0:
+            r = v;
+            g = t;
+            b = p;
+            break;
+        case 1:
+            r = q;
+            g = v;
+            b = p;
+            break;
+        case 2:
+            r = p;
+            g = v;
+            b = t;
+            break;
+        case 3:
+            r = p;
+            g = q;
+            b = v;
+            break;
+        case 4:
+            r = t;
+            g = p;
+            b = v;
+            break;
+        case 5:
+            r = v;
+            g = p;
+            b = q;
+            break;
+        }
+
+        ir = r * MAXPRI;
+        ig = g * MAXPRI;
+        ib = b * MAXPRI;
+    }
+
+    rgb565 = RGB_ILI(ir, ig, ib);
+
+    return (rgb565);
+}
+
+
 /* TRIS_begin --- switch GPIO pins to input or output as required */
 
 static void TRIS_begin(void)
@@ -925,6 +1009,11 @@ void main(void)
         after = millis();
         printf("\n%dx%d byte memcpy() took %dms\n", GRAT_WD, sizeof (pixels), after - before);
         
+        for (y = 0; y < GRAT_HT; y++)
+        {
+            pixels[y] = hsvto565(y, MAXPRI, MAXPRI);
+        }
+        
         before = millis();
         
         for (x = 0; x < GRAT_WD; x++)
@@ -1009,7 +1098,7 @@ void main(void)
             
             str[16] = '\0';
             
-            ili9486_renderFont((320 - (16 * 8)) / 2, (y * 8) + ((480 - (16 * 8)) / 2), ILI9486_GREEN, ILI9486_BLACK, str);
+            ili9486_renderFont((320 - (16 * 8)) / 2, (y * 8) + ((480 - (16 * 8)) / 2), ILI9486_BLACK, hsvto565(y * 16, MAXPRI, MAXPRI), str);
         }
         
         after = millis();
