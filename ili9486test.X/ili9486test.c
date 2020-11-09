@@ -675,6 +675,36 @@ void ili9486_pixMap(const int x1, const int y1, const int wd, const int ht, cons
 }
 
 
+void setPixel(const int x, const int y, const iliColr fg)
+{
+    iliCmd4(ILI9486_COL_ADDR, x >> 8, x, x >> 8, x);
+    iliCmd4(ILI9486_PAGE_ADDR, y >> 8, y, y >> 8, y);
+    
+    PMADDRbits.CS1 = 1;     // PMCS1 active
+    
+    while (PMMODEbits.BUSY)
+        ;
+    
+    PMADDRbits.ADDR = 0;
+    PMDIN = ILI9486_MEMORY_WR;
+    
+    while (PMMODEbits.BUSY)
+        ;
+    
+    PMADDRbits.ADDR = 1;
+    
+    while (PMMODEbits.BUSY)
+        ;
+
+    PMDIN = fg;     // Actually write the pixel here
+    
+    while (PMMODEbits.BUSY)
+        ;
+
+    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
+}
+
 
 /* hsvto565 --- convert HSV colour to 565-RGB */
 
@@ -963,16 +993,129 @@ void ili9486_renderScaledFont(const int x1, const int y1, const int xmag, const 
 }
 
 
+/* setLine --- draw a line between any two absolute co-ords */
+
+void setLine(int x1, int y1, int x2, int y2, const iliColr fg)
+{
+    int d;
+    int i1, i2;
+    int x, y;
+    const int dx = abs(x2 - x1);
+    const int dy = abs(y2 - y1);
+
+    if (((y1 > y2) && (dx < dy)) || ((x1 > x2) && (dx > dy)))
+    {
+        int temp = y1;
+        y1 = y2;
+        y2 = temp;
+
+        temp = x1;
+        x1 = x2;
+        x2 = temp;
+    }
+
+    if (dy > dx)
+    {
+        int xinc;
+        int yend;
+        
+        d = (2 * dx) - dy;       /* Slope > 1 */
+        i1 = 2 * dx;
+        i2 = 2 * (dx - dy);
+
+        if (y1 > y2)
+        {
+            x = x2;
+            y = y2;
+            yend = y1;
+        }
+        else
+        {
+            x = x1;
+            y = y1;
+            yend = y2;
+        }
+
+        if (x1 > x2)
+            xinc = -1;
+        else
+            xinc = 1;
+
+        setPixel(x, y, fg);
+
+        while (y < yend)
+        {
+            y++;
+            
+            if (d < 0)
+                d += i1;
+            else
+            {
+                x += xinc;
+                d += i2;
+            }
+
+            setPixel(x, y, fg);
+        }
+    }
+    else
+    {
+        int xend;
+        int yinc;
+        
+        d = (2 * dy) - dx;  /* Slope < 1 */
+        i1 = 2 * dy;
+        i2 = 2 * (dy - dx);
+
+        if (x1 > x2)
+        {
+            x = x2;
+            y = y2;
+            xend = x1;
+        }
+        else
+        {
+            x = x1;
+            y = y1;
+            xend = x2;
+        }
+
+        if (y1 > y2)
+            yinc = -1;
+        else
+            yinc = 1;
+
+        setPixel(x, y, fg);
+
+        while (x < xend)
+        {
+            x++;
+            
+            if (d < 0)
+                d += i1;
+            else
+            {
+                y += yinc;
+                d += i2;
+            }
+
+            setPixel(x, y, fg);
+        }
+    }
+}
+
+
 void main(void)
 {
     unsigned int before, after;
-    int x, y;
+    int i, x, y;
     uint8_t str[32];
     iliColr pixels[GRAT_HT];
     uint8_t wave1[GRAT_WD];
     uint8_t wave2[GRAT_WD];
     uint8_t wave3[GRAT_WD];
     uint8_t wave4[GRAT_WD];
+    uint16_t xx[256], yy[256];
     float theta1, delta1;
     float theta2, delta2;
     float offset1 = 128.0;
@@ -1178,6 +1321,26 @@ void main(void)
         
         after = millis();
         printf("\n%dx%d characters took %dms\n", 16, 16, after - before);
+        
+        delayms(500);
+        
+        for (i = 0; i < 256; i++)
+        {
+            const double theta = ((2.0 * M_PI) / 256.0) * (double)i;
+            
+            xx[i] = (int)((128.0 * cos(theta)) + 0.5) + 160;
+            yy[i] = (int)((128.0 * sin(theta)) + 0.5) + 240;
+        }
+        
+        before = millis();
+        
+        for (i = 0; i < 256; i++)
+        {
+            setLine(160, 240, xx[i], yy[i], ILI9486_WHITE); // hsvto565(i, MAXPRI, MAXPRI));
+        }
+        
+        after = millis();
+        printf("\n%d lines took %dms\n", 256, after - before);
         
         delayms(500);
     }
