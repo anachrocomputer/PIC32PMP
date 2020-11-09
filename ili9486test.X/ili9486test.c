@@ -453,7 +453,7 @@ void iliCmd1(const uint8_t cmd, const uint8_t arg1)
 
 /* iliCmd4 --- send a command byte followed by 4 parameter bytes */
 
-void iliCmd4(const uint8_t cmd, const uint8_t arg1, const uint8_t arg2, const uint8_t arg3, const uint8_t arg4)
+inline void iliCmd4(const uint8_t cmd, const uint8_t arg1, const uint8_t arg2, const uint8_t arg3, const uint8_t arg4)
 {
     PMADDRbits.CS1 = 1;     // PMCS1 active
     
@@ -675,7 +675,7 @@ void ili9486_pixMap(const int x1, const int y1, const int wd, const int ht, cons
 }
 
 
-void setPixel(const int x, const int y, const iliColr fg)
+inline void setPixel(const int x, const int y, const iliColr fg)
 {
     iliCmd4(ILI9486_COL_ADDR, x >> 8, x, x >> 8, x);
     iliCmd4(ILI9486_PAGE_ADDR, y >> 8, y, y >> 8, y);
