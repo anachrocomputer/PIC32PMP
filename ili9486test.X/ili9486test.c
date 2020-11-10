@@ -675,6 +675,14 @@ void ili9486_pixMap(const int x1, const int y1, const int wd, const int ht, cons
 }
 
 
+void setHline(const int x1, const int x2, const int y, const iliColr fg)
+{
+    iliCmd4(ILI9486_COL_ADDR, x1 >> 8, x1, x2 >> 8, x2);
+    iliCmd4(ILI9486_PAGE_ADDR, y >> 8, y, y >> 8, y);
+    ili9486_fill(fg, 1 + x2 - x1);
+}
+
+
 inline void setPixel(const int x, const int y, const iliColr fg)
 {
     iliCmd4(ILI9486_COL_ADDR, x >> 8, x, x >> 8, x);
@@ -1105,6 +1113,108 @@ void setLine(int x1, int y1, int x2, int y2, const iliColr fg)
 }
 
 
+/* ellipse --- draw an ellipse using Bresenham's algorithm */
+
+void ellipse(int x0, int y0, int x1, int y1, const int fg)
+{
+    // Based on code from http://members.chello.at/~easyfilter/bresenham.html
+    int a = abs(x1 - x0);
+    int b = abs(y1 - y0);
+    int b1 = b & 1;
+    int dx = 4L * (1 - a) * b * b;
+    int dy = 4L * (b1 + 1) * a * a;
+    int err = dx + dy + (b1 * a * a);
+    int e2;
+
+    if (x0 > x1)
+    {
+        x0 = x1;
+        x1 += a;
+    }
+
+    if (y0 > y1)
+    {
+        y0 = y1;
+    }
+
+    y0 += (b + 1) / 2;
+    y1 = y0 - b1;
+
+    a *= 8 * a;
+    b1 = 8 * b * b;
+
+    do
+    {
+        setHline(x0, x1, y0, fg);
+        setHline(x0, x1, y1, fg);
+
+        e2 = 2 * err;
+
+        if (e2 <= dy)
+        {
+            y0++;
+            y1--;
+            err += dy += a;
+        }
+
+        if ((e2 >= dx) || ((2L * err) > dy))
+        {
+            x0++;
+            x1--;
+            err += dx += b1;
+        }
+    } while (x0 <= x1);
+
+    while ((y0 - y1) < b)
+    { 
+        setHline(x0 - 1, x1 + 1, y0++, fg);
+        setHline(x0 - 1, x1 + 1, y1--, fg);
+    }
+}
+
+
+static void cpts(const int x0, const int y0, const int x, const int y, const iliColr fg)
+{
+    setHline(x0 - x, x0 + x, y0 + y, fg);
+    setHline(x0 - x, x0 + x, y0 - y, fg);
+    setHline(x0 - y, x0 + y, y0 + x, fg);
+    setHline(x0 - y, x0 + y, y0 - x, fg);
+}
+
+
+/* circle --- draw a circle using Michener's algorithm */
+
+void circle(const int x0, const int y0, const int r, const iliColr fg)
+{
+    int x, y;
+    int d;
+
+    x = 0;
+    y = r;
+    d = 3 - (2 * r);
+
+    while (x < y)
+    {
+        cpts (x0, y0, x, y, fg);
+
+        if (d < 0)
+        {
+            d += (4 * x) + 6;
+        }
+        else
+        {
+            d += (4 * (x - y)) + 10;
+            y--;
+        }
+
+        x++;
+    }
+
+    if (x == y)
+       cpts(x0, y0, x, y, fg);
+}
+
+
 void main(void)
 {
     unsigned int before, after;
@@ -1331,6 +1441,29 @@ void main(void)
             xx[i] = (int)((128.0 * cos(theta)) + 0.5) + 160;
             yy[i] = (int)((128.0 * sin(theta)) + 0.5) + 240;
         }
+        
+        before = millis();
+        
+        ellipse(160 - 128, 240 - 192, 160 + 128, 240 + 192, ILI9486_GREEN);
+        
+        after = millis();
+        
+        ellipse(160 - 128, 240 - 160, 160 + 128, 240 + 160, ILI9486_YELLOW);
+        ellipse(160 - 128, 240 - 128, 160 + 128, 240 + 128, ILI9486_BLUE);
+        ellipse(160 - 128, 240 -  96, 160 + 128, 240 +  96, ILI9486_RED);
+        
+        printf("\n%dx%d ellipse took %dms\n", 256, 384, after - before);
+        
+        delayms(500);
+        
+        before = millis();
+        
+        circle(160, 240, 128, ILI9486_BLACK);
+        
+        after = millis();
+        printf("\n%d radius circle took %dms\n", 128, after - before);
+        
+        delayms(500);
         
         before = millis();
         
