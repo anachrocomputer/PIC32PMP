@@ -63,3 +63,57 @@ Some pins on the HMDL-2416 displays are tied HIGH or LOW.
 PIC32 pin numbers are for the 100-pin package.
 
 LEDs light when the pin is pulled LOW.
+
+## Dev PCB Pinout ##
+| Signal | Chip  | Name       | Pin | Connector | Name     | Pin |
+|--------|-------|------------|-----|-----------|----------|-----|
+| 5V     |       |            |     |    P3     | USB_5V   | 4   |
+| 3.3V   | PIC32 | Vcc        |     |    P3     | 3V3      | 5   |
+| GND    | PIC32 | GND        |     |    P3     | GND_S    | 15  |
+| GND    | PIC32 | GND        |     |    P3     | GND_S    | 25  |
+| RESET  | PIC32 | RD3        |     |    P3     | RD3      | 28  |
+
+## Parallel master Port Pinout ##
+
+| Signal | Chip  | Name       | Pin | Connector | Name     | Pin |
+|--------|-------|------------|-----|-----------|----------|-----|
+| PMWR   | PIC32 | RD4/PMWR   | 81  |    P3     | DIP1_4   | 31  |
+| PMRD   | PIC32 | RD5/PMRD   | 82  |    P3     | RD5      | 32  |
+| PMCS1  | PIC32 | RD11/PMCS1 | 71  |    P3     | RD11     | 21  |
+| PMCS2  | PIC32 | RD10/PMCS2 | 70  |    P3     | SCK1     | 20  |
+| PMA0   | PIC32 | RB15/PMA0  | 44  |    P2     | HV_En    | 44  |
+| PMA1   | PIC32 | RB14/PMA1  | 43  |    P2     | U1_FAULT | 43  |
+| PMA2   | PIC32 | RG9/PMA2   | 14  |    P2     | RG9      | 14  |
+| PMA3   | PIC32 | RG8/PMA3   | 12  |    P2     | ULEG_TX  | 12  |
+| PMA4   | PIC32 | RG7/PMA4   | 11  |    P2     | ULEG_RX  | 11  |
+| PMA5   | PIC32 | RG6/PMA5   | 10  |    P2     | LEG_EN   | 10  |
+| PMA6   | PIC32 | RA10/PMA6  | 29  |    P2     | RA10     | 29  |
+| PMA7   | PIC32 | RA9/PMA7   | 28  |    P2     | RA9      | 28  |
+| PMA8   | PIC32 | RF5/PMA8   | 50  |    P2     | 3V3FAULT | 50  |
+| PMA9   | PIC32 | RF4/PMA9   | 49  |    P2     | V+FAULT  | 49  |
+| PMA10  | PIC32 | RB13/PMA10 | 42  |    P2     | U1_SENSE | 42  |
+| PMA11  | PIC32 | RB12/PMA11 | 41  |    P2     | RB12     | 41  |
+| PMA12  | PIC32 | RB11/PMA12 | 35  |    P2     | RB11     | 35  |
+| PMA13  | PIC32 | RB10/PMA13 | 34  |    P2     | RB10     | 34  |
+| PMA14  | PIC32 | RD11/PMA14 | 71  |    P3     | RD11     | 21  |
+| PMA15  | PIC32 | RD10/PMA15 | 70  |    P3     | SCK1     | 20  |
+| PMD0   | PIC32 | RE0/PMD0   | 93  |    P3     | RE0      | 43  |
+| PMD1   | PIC32 | RE1/PMD1   | 94  |    P3     | CE1      | 44  |
+| PMD2   | PIC32 | RE2/PMD2   | 98  |    P3     | RE2      | 48  |
+| PMD3   | PIC32 | RE3/PMD3   | 99  |    P3     | SDO1     | 49  |
+| PMD4   | PIC32 | RE4/PMD4   | 100 |    P3     | WP1      | 50  |
+| PMD5   | PIC32 | RE5/PMD5   | 3   |    P2     | LEG_Q2   |  3  |
+| PMD6   | PIC32 | RE6/PMD6   | 4   |    P2     | LEG_POT  |  4  |
+| PMD7   | PIC32 | RE7/PMD7   | 5   |    P2     | RE7      |  5  |
+| PMD8   | PIC32 | RG0/PMD8   | 90  |    P3     | RG0      | 40  |
+| PMD9   | PIC32 | RG1/PMD9   | 89  |    P3     | RG1      | 39  |
+| PMD10  | PIC32 | RF1/PMD10  | 88  |    P3     | RF1      | 38  |
+| PMD11  | PIC32 | RF0/PMD11  | 87  |    P3     | SDI1     | 37  |
+| PMD12  | PIC32 | RD12/PMD12 | 79  |    P3     | RD12     | 29  |
+| PMD13  | PIC32 | RD13/PMD13 | 80  |    P3     | RD13     | 30  |
+| PMD14  | PIC32 | RD6/PMD14  | 83  |    P3     | DIP2_1   | 33  |
+| PMD15  | PIC32 | RD7/PMD15  | 84  |    P3     | DIP2_2   | 34  |
+
+
+
+
