@@ -707,6 +707,8 @@ iliColr hsvto565(const int ih, const int is, const int iv)
 }
 
 
+/* generateGraticule --- precompute the scope graticule */
+
 void generateGraticule(const struct ColourScheme *cp)
 {
     int y;
@@ -1115,6 +1117,231 @@ void circle(const int x0, const int y0, const int r, const iliColr fg)
 }
 
 
+/* drawBoxes --- draw some concentric squares */
+
+void drawBoxes(void)
+{
+    uint32_t before, after;
+    
+    ili9486_fillRect(0, 80, 319, 319 + 80, ILI9486_ORANGE);
+    before = millis();
+    ili9486_fillRect(32, 112, 255 + 32, 255 + 112, ILI9486_WHITE);
+    after = millis();
+    ili9486_fillRect(64, 144, 191 + 64, 191 + 144, ILI9486_RED);
+    ili9486_fillRect(96, 176, 127 + 96, 127 + 176, ILI9486_GREEN);
+    ili9486_fillRect(128, 208, 63 + 128, 63 + 208, ILI9486_BLUE);
+    
+    printf("\n256x256 pixels took %dms\n", after - before);
+}
+
+
+/* drawGraduatedHues --- fill a rectangle with hues */
+
+void drawGraduatedHues(void)
+{
+    uint32_t before, after;
+    iliColr pixels[GRAT_HT];
+    int x, y;
+
+    before = millis();
+
+    for (x = 0; x < GRAT_WD; x++)
+    {
+        memcpy(pixels, C1grat, sizeof (pixels));
+    }
+
+    after = millis();
+    printf("\n%dx%d byte memcpy() took %dms\n", GRAT_WD, sizeof (pixels), after - before);
+
+    for (y = 0; y < GRAT_HT; y++)
+    {
+        pixels[y] = hsvto565(y, MAXPRI, MAXPRI);
+    }
+
+    before = millis();
+
+    for (x = 0; x < GRAT_WD; x++)
+    {
+        ili9486_pixMap(x + ((320 - GRAT_WD) / 2), (480 - GRAT_HT) / 2, 1, GRAT_HT, pixels);
+    }
+
+    after = millis();
+
+    printf("\n%dx%d ili9486_pixMap() took %dms\n", GRAT_WD, GRAT_HT, after - before);
+}
+
+
+/* drawOscilloscopeDisplay --- draw a simulated digital oscilloscope display */
+
+void drawOscilloscopeDisplay(void)
+{
+    uint32_t before, after;
+    iliColr pixels[GRAT_HT];
+    uint8_t wave1[GRAT_WD];
+    uint8_t wave2[GRAT_WD];
+    uint8_t wave3[GRAT_WD];
+    uint8_t wave4[GRAT_WD];
+    bool cursorMode = true;
+    int xcursor1 = 34, xcursor2 = 241;
+    int ycursor1 = 54, ycursor2 = 237;
+    int yshift1 = 22;
+    int yshift2 = -22;
+    int yshift3 = 64;
+    int yshift4 = 32;
+    float theta1, delta1;
+    float theta2, delta2;
+    float offset1 = 128.0;
+    float offset2 = 192.0;
+    int x;
+    
+    // Synthesise four dummy waveforms
+    delta1 = (M_PI * 4.0) / (float)GRAT_WD;
+    delta2 = (M_PI * 8.0) / (float)GRAT_WD;
+
+    for (x = 0; x < GRAT_WD; x++)
+    {
+        theta1 = (float)x * delta1;
+        theta2 = (float)x * delta2;
+
+        wave1[x] = (sin(theta1) * 50.0) + offset1;
+        wave2[x] = (sin(theta2) * 50.0) + offset2;
+        wave3[x] = sin(theta1) > 0.0? 32: 0;
+        wave4[x] = sin(theta2) > 0.0? 32: 0;
+    }
+    
+    before = millis();
+        
+    for (x = 0; x < GRAT_WD; x++)
+    {
+        // Draw the graticule, cursors or background
+        if ((cursorMode == true) && (x == xcursor1))
+            memcpy(pixels, C1grat, sizeof (pixels));
+        else if ((cursorMode == true) && (x == xcursor2))
+            memcpy(pixels, C2grat, sizeof (pixels));
+        else if ((x == 1) || (x == ((GRAT_WD / 2) + 1)) || (x == ((GRAT_WD / 2) - 1)) || (x == (GRAT_WD - 2)))
+            memcpy(pixels, Dgrat, sizeof (pixels));
+        else if ((x % GRATICULE) == 0)
+            memcpy(pixels, Wgrat, sizeof (pixels));
+        else if ((x % 8) == 0)
+            memcpy(pixels, Tgrat, sizeof (pixels));
+        else
+            memcpy(pixels, Bgrat, sizeof (pixels));
+
+        // Add two Y-cursors
+        if ((cursorMode == true) && ((x % 2) == 0)) {
+            pixels[ycursor1] = LCDColours.ycursor1;
+            pixels[ycursor2] = LCDColours.ycursor2;
+        }
+
+        // Add the four waveforms
+        interpolateY(wave1, x, yshift1, pixels, LCDColours.trace1);
+        interpolateY(wave2, x, yshift2, pixels, LCDColours.trace2);
+        interpolateY(wave3, x, yshift3, pixels, LCDColours.trace3);
+        interpolateY(wave4, x, yshift4, pixels, LCDColours.trace4);
+
+        ili9486_pixMap(x + ((320 - GRAT_WD) / 2), (480 - GRAT_HT) / 2, 1, GRAT_HT, pixels);
+    }
+
+    after = millis();
+    printf("\n%dx%d scope display took %dms\n", GRAT_WD, GRAT_HT, after - before);
+}
+
+
+/* drawText --- draw a block of text */
+
+void drawText(void)
+{
+    uint32_t before, after;
+    uint8_t str[32];
+    int x, y;
+    
+    before = millis();
+        
+    for (y = 0; y < 16; y++)
+    {
+        for (x = 0; x < 16; x++)
+        {
+            uint8_t ch = (y * 16) + x;
+
+            if (ch == 0)
+                ch = ' ';
+
+            str[x] = ch;
+        }
+
+        str[16] = '\0';
+
+        ili9486_renderScaledFont((320 - (16 * FONT_WD * XMAG)) / 2, (y * FONT_HT * YMAG) + ((480 - (16 * FONT_HT * YMAG)) / 2), XMAG, YMAG, ILI9486_BLACK, hsvto565(y * 16, MAXPRI, MAXPRI), str);
+    }
+
+    after = millis();
+    printf("\n%dx%d characters took %dms\n", 16, 16, after - before);
+}
+
+
+/* drawEllipses --- draw ellipses of different aspect ratios */
+
+void drawEllipses(void)
+{
+    uint32_t before, after;
+    
+    before = millis();
+        
+    ellipse(160 - 128, 240 - 192, 160 + 128, 240 + 192, ILI9486_GREEN);
+
+    after = millis();
+
+    ellipse(160 - 128, 240 - 160, 160 + 128, 240 + 160, ILI9486_YELLOW);
+    ellipse(160 - 128, 240 - 128, 160 + 128, 240 + 128, ILI9486_BLUE);
+    ellipse(160 - 128, 240 -  96, 160 + 128, 240 +  96, ILI9486_RED);
+
+    printf("\n%dx%d ellipse took %dms\n", 256, 384, after - before);
+}
+
+
+/* drawCircles --- draw circles */
+
+void drawCircles(void)
+{
+    uint32_t before, after;
+    
+    before = millis();
+        
+    circle(160, 240, 128, ILI9486_BLACK);
+
+    after = millis();
+    printf("\n%d radius circle took %dms\n", 128, after - before);
+}
+
+
+/* drawLines --- draw lines radiating from centre */
+
+void drawLines(void)
+{
+    uint32_t before, after;
+    uint16_t x[256], y[256];
+    int i;
+    
+    for (i = 0; i < 256; i++)
+    {
+        const double theta = ((2.0 * M_PI) / 256.0) * (double)i;
+
+        x[i] = (int)((128.0 * cos(theta)) + 0.5) + 160;
+        y[i] = (int)((128.0 * sin(theta)) + 0.5) + 240;
+    }
+    
+    before = millis();
+        
+    for (i = 0; i < 256; i++)
+    {
+        setLine(160, 240, x[i], y[i], ILI9486_WHITE); // hsvto565(i, MAXPRI, MAXPRI));
+    }
+
+    after = millis();
+    printf("\n%d lines took %dms\n", 256, after - before);
+}
+
+
 /* initMCU --- set up the microcontroller in general */
 
 void initMCU(void)
@@ -1219,26 +1446,6 @@ static void initPMP(void)
 
 void main(void)
 {
-    unsigned int before, after;
-    int i, x, y;
-    uint8_t str[32];
-    iliColr pixels[GRAT_HT];
-    uint8_t wave1[GRAT_WD];
-    uint8_t wave2[GRAT_WD];
-    uint8_t wave3[GRAT_WD];
-    uint8_t wave4[GRAT_WD];
-    uint16_t xx[256], yy[256];
-    float theta1, delta1;
-    float theta2, delta2;
-    float offset1 = 128.0;
-    float offset2 = 192.0;
-    bool cursorMode = true;
-    int xcursor1 = 34, xcursor2 = 241;
-    int ycursor1 = 54, ycursor2 = 237;
-    int yshift1 = 22;
-    int yshift2 = -22;
-    int yshift3 = 64;
-    int yshift4 = 32;
     static uint16_t pixMap[64] = {0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
                                   0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
                                   0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0,  // green
@@ -1262,29 +1469,11 @@ void main(void)
     
     generateGraticule(&LCDColours);
     
-    // Synthesise four dummy waveforms
-    delta1 = (M_PI * 4.0) / (float)GRAT_WD;
-    delta2 = (M_PI * 8.0) / (float)GRAT_WD;
-
-    for (x = 0; x < GRAT_WD; x++)
-    {
-        theta1 = (float)x * delta1;
-        theta2 = (float)x * delta2;
-
-        wave1[x] = (sin(theta1) * 50.0) + offset1;
-        wave2[x] = (sin(theta2) * 50.0) + offset2;
-        wave3[x] = sin(theta1) > 0.0? 32: 0;
-        wave4[x] = sin(theta2) > 0.0? 32: 0;
-    }
-   
-    
-    ili9486_fill(ILI9486_WHITE, 480u * 320u);
-    
     while (1)
     {
         LED1 = 0;
         LED2 = 1;
-        ili9486_fillRect(0, 0, 319, 0, ILI9486_WHITE);
+        ili9486_fillRect(0, 0, 319, 479, ILI9486_WHITE);    // Clear the screen
         
         delayms(500);
                
@@ -1293,46 +1482,14 @@ void main(void)
         ili9486_pixMap(8, 8, 8, 8, pixMap);
         ili9486_pixMap((320 - 64) / 2, 8, 64, 64, (const uint16_t *)Image);
         
-        ili9486_fillRect(0, 80, 319, 319 + 80, ILI9486_ORANGE);
-        
-        before = millis();
-        ili9486_fillRect(32, 112, 255 + 32, 255 + 112, ILI9486_WHITE);
-        after = millis();
-        ili9486_fillRect(64, 144, 191 + 64, 191 + 144, ILI9486_RED);
-        ili9486_fillRect(96, 176, 127 + 96, 127 + 176, ILI9486_GREEN);
-        ili9486_fillRect(128, 208, 63 + 128, 63 + 208, ILI9486_BLUE);
-        printf("\n256x256 pixels took %dms\n", after - before);
+        drawBoxes();
                 
         delayms(500);
         
         LED1 = 0;
         LED2 = 0;
-        ili9486_fillRect(0, 0, 319, 0, ILI9486_MAGENTA);
-        
-        before = millis();
-        
-        for (x = 0; x < GRAT_WD; x++)
-        {
-            memcpy(pixels, C1grat, sizeof (pixels));
-        }
-        
-        after = millis();
-        printf("\n%dx%d byte memcpy() took %dms\n", GRAT_WD, sizeof (pixels), after - before);
-        
-        for (y = 0; y < GRAT_HT; y++)
-        {
-            pixels[y] = hsvto565(y, MAXPRI, MAXPRI);
-        }
-        
-        before = millis();
-        
-        for (x = 0; x < GRAT_WD; x++)
-        {
-            ili9486_pixMap(x + ((320 - GRAT_WD) / 2), (480 - GRAT_HT) / 2, 1, GRAT_HT, pixels);
-        }
-        
-        after = millis();
-        printf("\n%dx%d ili9486_pixMap() took %dms\n", GRAT_WD, GRAT_HT, after - before);
+
+        drawGraduatedHues();
         
         delayms(500);
         
@@ -1348,114 +1505,26 @@ void main(void)
         LED1 = 1;
         LED2 = 0;
         
-        before = millis();
-        
-        for (x = 0; x < GRAT_WD; x++)
-        {
-            // Draw the graticule, cursors or background
-            if ((cursorMode == true) && (x == xcursor1))
-                memcpy(pixels, C1grat, sizeof (pixels));
-            else if ((cursorMode == true) && (x == xcursor2))
-                memcpy(pixels, C2grat, sizeof (pixels));
-            else if ((x == 1) || (x == ((GRAT_WD / 2) + 1)) || (x == ((GRAT_WD / 2) - 1)) || (x == (GRAT_WD - 2)))
-                memcpy(pixels, Dgrat, sizeof (pixels));
-            else if ((x % GRATICULE) == 0)
-                memcpy(pixels, Wgrat, sizeof (pixels));
-            else if ((x % 8) == 0)
-                memcpy(pixels, Tgrat, sizeof (pixels));
-            else
-                memcpy(pixels, Bgrat, sizeof (pixels));
-            
-            // Add two Y-cursors
-            if ((cursorMode == true) && ((x % 2) == 0)) {
-                pixels[ycursor1] = LCDColours.ycursor1;
-                pixels[ycursor2] = LCDColours.ycursor2;
-            }
-            
-            // Add the four waveforms
-            interpolateY(wave1, x, yshift1, pixels, LCDColours.trace1);
-            interpolateY(wave2, x, yshift2, pixels, LCDColours.trace2);
-            interpolateY(wave3, x, yshift3, pixels, LCDColours.trace3);
-            interpolateY(wave4, x, yshift4, pixels, LCDColours.trace4);
-        
-            ili9486_pixMap(x + ((320 - GRAT_WD) / 2), (480 - GRAT_HT) / 2, 1, GRAT_HT, pixels);
-        }
-        
-        after = millis();
-        printf("\n%dx%d scope display took %dms\n", GRAT_WD, GRAT_HT, after - before);
-        
-        ili9486_fillRect(0, 0, 319, 0, ILI9486_GREEN);
+        drawOscilloscopeDisplay();
         
         delayms(500);
         
         LED1 = 1;
         LED2 = 0;
-        ili9486_fillRect(0, 0, 319, 0, ILI9486_ORANGE);
         
-        before = millis();
-        
-        for (y = 0; y < 16; y++)
-        {
-            for (x = 0; x < 16; x++)
-            {
-                uint8_t ch = (y * 16) + x;
-                
-                if (ch == 0)
-                    ch = ' ';
-                
-                str[x] = ch;
-            }
-            
-            str[16] = '\0';
-            
-            ili9486_renderScaledFont((320 - (16 * FONT_WD * XMAG)) / 2, (y * FONT_HT * YMAG) + ((480 - (16 * FONT_HT * YMAG)) / 2), XMAG, YMAG, ILI9486_BLACK, hsvto565(y * 16, MAXPRI, MAXPRI), str);
-        }
-        
-        after = millis();
-        printf("\n%dx%d characters took %dms\n", 16, 16, after - before);
+        drawText();
         
         delayms(500);
         
-        for (i = 0; i < 256; i++)
-        {
-            const double theta = ((2.0 * M_PI) / 256.0) * (double)i;
-            
-            xx[i] = (int)((128.0 * cos(theta)) + 0.5) + 160;
-            yy[i] = (int)((128.0 * sin(theta)) + 0.5) + 240;
-        }
-        
-        before = millis();
-        
-        ellipse(160 - 128, 240 - 192, 160 + 128, 240 + 192, ILI9486_GREEN);
-        
-        after = millis();
-        
-        ellipse(160 - 128, 240 - 160, 160 + 128, 240 + 160, ILI9486_YELLOW);
-        ellipse(160 - 128, 240 - 128, 160 + 128, 240 + 128, ILI9486_BLUE);
-        ellipse(160 - 128, 240 -  96, 160 + 128, 240 +  96, ILI9486_RED);
-        
-        printf("\n%dx%d ellipse took %dms\n", 256, 384, after - before);
+        drawEllipses();
         
         delayms(500);
         
-        before = millis();
-        
-        circle(160, 240, 128, ILI9486_BLACK);
-        
-        after = millis();
-        printf("\n%d radius circle took %dms\n", 128, after - before);
+        drawCircles();
         
         delayms(500);
         
-        before = millis();
-        
-        for (i = 0; i < 256; i++)
-        {
-            setLine(160, 240, xx[i], yy[i], ILI9486_WHITE); // hsvto565(i, MAXPRI, MAXPRI));
-        }
-        
-        after = millis();
-        printf("\n%d lines took %dms\n", 256, after - before);
+        drawLines();
         
         delayms(500);
     }
