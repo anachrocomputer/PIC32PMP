@@ -197,17 +197,6 @@ static struct UART_BUFFER U3Buf;
 volatile uint32_t MilliSeconds = 0;
 
 
-/* dally --- CPU busy-loop for crude time delay */
-
-static void dally(const int loops)
-{
-    volatile int dally;
-    
-    for (dally = 0; dally < loops; dally++)
-        ;
-}
-
-
 /* delayms --- busy-wait delay for given number of milliseconds */
 
 static void delayms(const uint32_t interval)
@@ -227,7 +216,7 @@ static uint32_t millis(void)
 }
 
 
-void __ISR(_TIMER_1_VECTOR, ipl2AUTO) Timer1Handler(void) 
+void __ISR(_TIMER_1_VECTOR, ipl7AUTO) Timer1Handler(void) 
 {
     MilliSeconds++;
     
@@ -282,33 +271,6 @@ void __ISR(_UART_3_VECTOR, ipl1AUTO) UART3Handler(void)
 }
 
 
-static void UART3_begin(const int baud)
-{
-    U3Buf.tx.head = 0;
-    U3Buf.tx.tail = 0;
-    U3Buf.rx.head = 0;
-    U3Buf.rx.tail = 0;
-
-    U3MODEbits.UEN = 3;     // Use just Rx/Tx; no handshaking
-    
-    U3STAbits.UTXEN = 1;    // Enable Tx
-    U3STAbits.URXEN = 1;    // Enable Rx
-    
-    U3BRG = (40000000 / (baud * 16)) - 1;
-    
-    IPC9bits.U3IP = 1;          // UART3 interrupt priority 1
-    IPC9bits.U3IS = 0;          // UART3 interrupt sub-priority 0
-    
-    IFS2CLR = _IFS2_U3TXIF_MASK;  // Clear UART3 Tx interrupt flag
-    IFS1CLR = _IFS1_U3RXIF_MASK;  // Clear UART3 Rx interrupt flag
-    IFS1CLR = _IFS1_U3EIF_MASK;   // Clear UART3 error interrupt flag
-    
-    IEC1SET = _IEC1_U3RXIE_MASK;  // Enable UART3 Rx interrupt
-    IEC1SET = _IEC1_U3EIE_MASK;   // Enable UART3 error interrupt
-    
-    U3MODESET = _U3MODE_ON_MASK;      // Enable USART3
-}
-
 uint8_t UART3RxByte(void)
 {
     const uint8_t tmptail = (U3Buf.rx.tail + 1) & UART_RX_BUFFER_MASK;
@@ -354,69 +316,11 @@ void _mon_putc(const char ch)
 }
 
 
-/* PMP_begin --- initialise the Parallel Master Port as a 16-bit Z80-style bus */
-
-static void PMP_begin(void)
-{
-    PMMODEbits.MODE16 = 1;  // 16 data bit mode
-    PMMODEbits.WAITB = 0;   // Setup time wait states
-    PMMODEbits.WAITM = 0;   // Read/write strobe width
-    PMMODEbits.WAITE = 0;   // Hold time wait states
-    PMMODEbits.IRQM = 0;    // No interrupts
-    PMMODEbits.INCM = 0;    // No auto-increment
-    PMMODEbits.MODE = 2;    // /WR and /RD mode (Z80 style bus)
-    
-    PMCONbits.ADRMUX = 0;   // Non-multiplexed address bus
-    PMCONbits.PTRDEN = 1;   // Enable the PMRD pin (pin 82, P3 pin 32)
-    PMCONbits.PTWREN = 1;   // Enable the PMWR pin (pin 81, P3 pin 31)
-    PMCONbits.RDSP = 0;     // PMRD active-LOW
-    PMCONbits.WRSP = 0;     // PMWR active-LOW
-    PMCONbits.CSF = 2;      // PMCS1 and PMCS2 are Chip Select pins
-    PMCONbits.CS1P = 0;     // PMCS1 active-LOW
-    PMCONbits.CS2P = 0;     // PMCS2 active-LOW
-    
-    PMAENbits.PTEN = 0x03 | (1 << 14) | (1 << 15);
-    
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive (pin 71, P3 pin 21)
-    PMADDRbits.CS2 = 0;     // PMCS2 inactive (pin 70, P3 pin 20)
-    
-    PMCONbits.ON = 1;       // Enable the Parallel Master Port module
-}
-
-
-/* PPS_begin --- map Peripheral Pin Select to suit dev board */
-
-static void PPS_begin(void)
-{
-    /* Configure USART3 */
-    RPC1Rbits.RPC1R = 1;    // U3Tx on pin 6, RPC1, P2 pin 6
-    U3RXRbits.U3RXR = 10;   // U3Rx on pin 9, RPC4, P2 pin 9 (5V tolerant)
-    
-    /* Configure SPI1 */
-    // SCK1 on pin 70, RD10 clashes with PMP
-    //SDI1Rbits.SDI1R = 0;   // SDI1 on RPD3
-    //RPC13Rbits.RPC13R = 8; // SDO1 on RPC13
-    
-    /* Configure SPI2 */
-    // SCK2 on pin 10, RG6 clashes with PMP
-    //SDI2Rbits.SDI2R = 0;   // SDI2 on RPD3, pin 78
-    //RPC13Rbits.RPC13R = 6; // SDO2 on RPC13, pin 73
-    
-    /* Configure SPI3 */
-    // SCK3 on pin 39, RF13, P2 pin 39
-    //SDI3Rbits.SDI3R = 0;   // SDI3 on RPD2, pin 77
-    //RPG8Rbits.RPG8R = 14;  // SDO3 on RPG8, pin 12 clashes with PMP
-    
-    /* Configure SPI4 */
-    // SCK4 on pin 48, RD15, P2 pin 48
-}
-
-
 /* iliCmd0 --- send a command byte with no parameter bytes */
 
 void iliCmd0(const uint8_t cmd)
 {
-    PMADDRbits.CS1 = 1;     // PMCS1 active
+    PMADDRSET = _PMADDR_CS1_MASK;   // PMCS1 active
     
     while (PMMODEbits.BUSY)
         ;
@@ -427,7 +331,7 @@ void iliCmd0(const uint8_t cmd)
     while (PMMODEbits.BUSY)
             ;
 
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMADDRCLR = _PMADDR_CS1_MASK;   // PMCS1 inactive
 }
 
 
@@ -435,7 +339,7 @@ void iliCmd0(const uint8_t cmd)
 
 void iliCmd1(const uint8_t cmd, const uint8_t arg1)
 {
-    PMADDRbits.CS1 = 1;     // PMCS1 active
+    PMADDRSET = _PMADDR_CS1_MASK;   // PMCS1 active
     
     while (PMMODEbits.BUSY)
         ;
@@ -452,7 +356,7 @@ void iliCmd1(const uint8_t cmd, const uint8_t arg1)
     while (PMMODEbits.BUSY)
             ;
 
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMADDRCLR = _PMADDR_CS1_MASK;   // PMCS1 inactive
 }
 
 
@@ -460,7 +364,7 @@ void iliCmd1(const uint8_t cmd, const uint8_t arg1)
 
 inline void iliCmd4(const uint8_t cmd, const uint8_t arg1, const uint8_t arg2, const uint8_t arg3, const uint8_t arg4)
 {
-    PMADDRbits.CS1 = 1;     // PMCS1 active
+    PMADDRSET = _PMADDR_CS1_MASK;   // PMCS1 active
     
     while (PMMODEbits.BUSY)
         ;
@@ -492,7 +396,7 @@ inline void iliCmd4(const uint8_t cmd, const uint8_t arg1, const uint8_t arg2, c
     while (PMMODEbits.BUSY)
         ;
 
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMADDRCLR = _PMADDR_CS1_MASK;   // PMCS1 inactive
 }
 
 
@@ -502,7 +406,7 @@ void iliCmd15(const uint8_t cmd, const uint8_t arg[15])
 {
     int i;
     
-    PMADDRbits.CS1 = 1;     // PMCS1 active
+    PMADDRSET = _PMADDR_CS1_MASK;   // PMCS1 active
     
     while (PMMODEbits.BUSY)
         ;
@@ -522,7 +426,7 @@ void iliCmd15(const uint8_t cmd, const uint8_t arg[15])
     while (PMMODEbits.BUSY)
             ;
 
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMADDRCLR = _PMADDR_CS1_MASK;   // PMCS1 inactive
 }
 
 
@@ -536,11 +440,14 @@ void ili9486_begin(void)
                                  0x75, 0x37, 0x06, 0x10, 0x03, 0x24, 0x20, 0x00};
     static uint8_t dgamma[15] = {0x0F, 0x32, 0x2E, 0x0B, 0x0D, 0x05, 0x47,
                                  0x75, 0x37, 0x06, 0x10, 0x03, 0x24, 0x20, 0x00};
-    LATDbits.LATD3 = 1;
+    
+    TRISDCLR = _TRISD_TRISD3_MASK;   // RD3 pin 78, P3 pin 28 as output (LCD RESET)
+    
+    LATDSET = _LATD_LATD3_MASK;
     delayms(20);
-    LATDbits.LATD3 = 0;     // Assert display RESET, active LOW
+    LATDCLR = _LATD_LATD3_MASK;    // Assert display RESET, active LOW
     delayms(20);
-    LATDbits.LATD3 = 1;
+    LATDSET = _LATD_LATD3_MASK;
     delayms(20);
     
     iliCmd1(ILI9486_IFMODECTRL, 0x00); // Interface Mode Control
@@ -567,7 +474,7 @@ void ili9486_fill(const uint16_t pixel, const uint32_t n)
 {
     int i;
     
-    PMADDRbits.CS1 = 1;     // PMCS1 active
+    PMADDRSET = _PMADDR_CS1_MASK;   // PMCS1 active
     
     while (PMMODEbits.BUSY)
         ;
@@ -591,7 +498,7 @@ void ili9486_fill(const uint16_t pixel, const uint32_t n)
     while (PMMODEbits.BUSY)
         ;
 
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMADDRCLR = _PMADDR_CS1_MASK;   // PMCS1 inactive
     PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
 }
 
@@ -603,7 +510,7 @@ void ili9486_write(const uint16_t buf[], const uint32_t n)
     int i;
     const uint16_t *p = buf;
     
-    PMADDRbits.CS1 = 1;     // PMCS1 active
+    PMADDRSET = _PMADDR_CS1_MASK;   // PMCS1 active
     
     while (PMMODEbits.BUSY)
         ;
@@ -652,7 +559,7 @@ void ili9486_write(const uint16_t buf[], const uint32_t n)
     while (PMMODEbits.BUSY)
         ;
 
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMADDRCLR = _PMADDR_CS1_MASK;   // PMCS1 inactive
     PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
 }
 
@@ -693,7 +600,7 @@ inline void setPixel(const int x, const int y, const iliColr fg)
     iliCmd4(ILI9486_COL_ADDR, x >> 8, x, x >> 8, x);
     iliCmd4(ILI9486_PAGE_ADDR, y >> 8, y, y >> 8, y);
     
-    PMADDRbits.CS1 = 1;     // PMCS1 active
+    PMADDRSET = _PMADDR_CS1_MASK;   // PMCS1 active
     
     while (PMMODEbits.BUSY)
         ;
@@ -714,7 +621,7 @@ inline void setPixel(const int x, const int y, const iliColr fg)
     while (PMMODEbits.BUSY)
         ;
 
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMADDRCLR = _PMADDR_CS1_MASK;   // PMCS1 inactive
     PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
 }
 
@@ -800,18 +707,6 @@ iliColr hsvto565(const int ih, const int is, const int iv)
 }
 
 
-/* TRIS_begin --- switch GPIO pins to input or output as required */
-
-static void TRIS_begin(void)
-{
-    TRISAbits.TRISA7 = 0;   // RA7 pin 92, P3 pin 42 as output (timer toggle)
-    TRISAbits.TRISA6 = 0;   // RA6 pin 91, P3 pin 41 as output (LED1)
-    TRISBbits.TRISB9 = 0;   // RB9 pin 33, P2 pin 33 as output (LED2)
-    
-    TRISDbits.TRISD3 = 0;   // RD3 pin 78, P3 pin 28 as output (LCD RESET)
-}
-
-
 void generateGraticule(const struct ColourScheme *cp)
 {
     int y;
@@ -889,7 +784,7 @@ void ili9486_renderFont(const int x1, const int y1, const iliColr fg, const iliC
     iliCmd4(ILI9486_COL_ADDR, x1 >> 8, x1, x2 >> 8, x2);
     iliCmd4(ILI9486_PAGE_ADDR, y1 >> 8, y1, y2 >> 8, y2);
     
-    PMADDRbits.CS1 = 1;     // PMCS1 active
+    PMADDRSET = _PMADDR_CS1_MASK;   // PMCS1 active
     
     while (PMMODEbits.BUSY)
         ;
@@ -932,7 +827,7 @@ void ili9486_renderFont(const int x1, const int y1, const iliColr fg, const iliC
     while (PMMODEbits.BUSY)
         ;
 
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive
+    PMADDRCLR = _PMADDR_CS1_MASK;   // PMCS1 inactive
     PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
 }
 
@@ -952,7 +847,7 @@ void ili9486_renderScaledFont(const int x1, const int y1, const int xmag, const 
     iliCmd4(ILI9486_COL_ADDR, x1 >> 8, x1, x2 >> 8, x2);
     iliCmd4(ILI9486_PAGE_ADDR, y1 >> 8, y1, y2 >> 8, y2);
 
-    PMADDRbits.CS1 = 1; // PMCS1 active
+    PMADDRSET = _PMADDR_CS1_MASK;   // PMCS1 active
 
     while (PMMODEbits.BUSY)
         ;
@@ -1001,7 +896,7 @@ void ili9486_renderScaledFont(const int x1, const int y1, const int xmag, const 
     while (PMMODEbits.BUSY)
         ;
 
-    PMADDRbits.CS1 = 0; // PMCS1 inactive
+    PMADDRCLR = _PMADDR_CS1_MASK;   // PMCS1 inactive
     PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
 }
 
@@ -1220,6 +1115,108 @@ void circle(const int x0, const int y0, const int r, const iliColr fg)
 }
 
 
+/* initMCU --- set up the microcontroller in general */
+
+void initMCU(void)
+{
+    /* Configure interrupts */
+    INTCONSET = _INTCON_MVEC_MASK; // Multi-vector mode
+}
+
+
+/* initGPIOs --- set up the GPIO pins */
+
+static void initGPIOs(void)
+{
+    TRISAbits.TRISA7 = 0;   // RA7 pin 92, P3 pin 42 as output (timer toggle)
+    TRISAbits.TRISA6 = 0;   // RA6 pin 91, P3 pin 41 as output (LED1)
+    TRISBbits.TRISB9 = 0;   // RB9 pin 33, P2 pin 33 as output (LED2)
+}
+
+
+/* initMillisecondTimer --- set up a timer to interrupt every millisecond */
+
+void initMillisecondTimer(void)
+{
+    /* Configure Timer 1 for 1kHz/1ms interrupts */
+    T1CONbits.TCKPS = 0;        // Timer 1 prescale: 1
+    
+    TMR1 = 0x00;                // Clear Timer 1 counter
+    PR1 = 40000 - 1;            // Interrupt every 40000 ticks (1ms)
+    
+    IPC1bits.T1IP = 7;          // Timer 1 interrupt priority 7 (highest)
+    IPC1bits.T1IS = 1;          // Timer 1 interrupt sub-priority 1
+    IFS0CLR = _IFS0_T1IF_MASK;  // Clear Timer 1 interrupt flag
+    IEC0SET = _IEC0_T1IE_MASK;  // Enable Timer 1 interrupt
+    
+    T1CONSET = _T1CON_ON_MASK;  // Enable Timer 1
+}
+
+
+/* initUARTs --- set up UART(s) and buffers, and connect to 'stdout' */
+
+static void initUARTs(void)
+{
+    const int baud = 9600;
+    
+    U3Buf.tx.head = 0;
+    U3Buf.tx.tail = 0;
+    U3Buf.rx.head = 0;
+    U3Buf.rx.tail = 0;
+
+    /* Configure PPS */
+    RPC1Rbits.RPC1R = 1;    // U3Tx on pin 6, RPC1, P2 pin 6
+    U3RXRbits.U3RXR = 10;   // U3Rx on pin 9, RPC4, P2 pin 9 (5V tolerant)
+    
+    U3MODEbits.UEN = 3;     // Use just Rx/Tx; no handshaking
+    
+    U3BRG = (40000000 / (baud * 16)) - 1;
+    
+    IPC9bits.U3IP = 1;          // UART3 interrupt priority 1 (lowest)
+    IPC9bits.U3IS = 0;          // UART3 interrupt sub-priority 0
+    
+    IFS2CLR = _IFS2_U3TXIF_MASK;  // Clear UART3 Tx interrupt flag
+    IFS1CLR = _IFS1_U3RXIF_MASK;  // Clear UART3 Rx interrupt flag
+    IFS1CLR = _IFS1_U3EIF_MASK;   // Clear UART3 error interrupt flag
+    
+    IEC1SET = _IEC1_U3RXIE_MASK;  // Enable UART3 Rx interrupt
+    IEC1SET = _IEC1_U3EIE_MASK;   // Enable UART3 error interrupt
+    
+    U3MODESET = _U3MODE_ON_MASK;      // Enable USART3
+    U3STASET = _U3STA_UTXEN_MASK | _U3STA_URXEN_MASK; // Enable Rx and Tx
+}
+
+
+/* initPMP --- initialise the Parallel Master Port as a 16-bit Z80-style bus */
+
+static void initPMP(void)
+{
+    PMMODEbits.MODE16 = 1;  // 16 data bit mode
+    PMMODEbits.WAITB = 0;   // Setup time wait states
+    PMMODEbits.WAITM = 0;   // Read/write strobe width
+    PMMODEbits.WAITE = 0;   // Hold time wait states
+    PMMODEbits.IRQM = 0;    // No interrupts
+    PMMODEbits.INCM = 0;    // No auto-increment
+    PMMODEbits.MODE = 2;    // /WR and /RD mode (Z80 style bus)
+    
+    PMCONbits.ADRMUX = 0;   // Non-multiplexed address bus
+    PMCONbits.PTRDEN = 1;   // Enable the PMRD pin (pin 82, P3 pin 32)
+    PMCONbits.PTWREN = 1;   // Enable the PMWR pin (pin 81, P3 pin 31)
+    PMCONbits.RDSP = 0;     // PMRD active-LOW
+    PMCONbits.WRSP = 0;     // PMWR active-LOW
+    PMCONbits.CSF = 2;      // PMCS1 and PMCS2 are Chip Select pins
+    PMCONbits.CS1P = 0;     // PMCS1 active-LOW
+    PMCONbits.CS2P = 0;     // PMCS2 active-LOW
+    
+    PMAENbits.PTEN = 0x03 | (1 << 14) | (1 << 15);
+    
+    PMADDRbits.CS1 = 0;     // PMCS1 inactive (pin 71, P3 pin 21)
+    PMADDRbits.CS2 = 0;     // PMCS2 inactive (pin 70, P3 pin 20)
+    
+    PMCONSET = _PMCON_ON_MASK; // Enable the Parallel Master Port module
+}
+
+
 void main(void)
 {
     unsigned int before, after;
@@ -1251,33 +1248,13 @@ void main(void)
                                   0xffff, 0x0000, 0xffff, 0x0000, 0xffff, 0x0000, 0xffff, 0x0000,  // black/white
                                   0x0000, 0xffff, 0x0000, 0xffff, 0x0000, 0xffff, 0x0000, 0xffff}; // black/white
     
-    /* Set up peripherals to match pin connections on PCB */
-    PPS_begin();
+    initMCU();
+    initGPIOs();
+    initUARTs();
+    initPMP();
+    initMillisecondTimer();
     
-    /* Configure tri-state registers */
-    TRIS_begin();
-    
-    UART3_begin(9600);
-    
-    PMP_begin();
-    
-    /* Configure Timer 1 */
-    T1CONbits.TCKPS = 0;        // Timer 1 prescale: 1
-    
-    TMR1 = 0x00;                // Clear Timer 1 counter
-    PR1 = 39999;                // Interrupt every 40000 ticks (1ms)
-    
-    T1CONbits.ON = 1;           // Enable Timer 1
-    
-    /* Configure interrupts */
-    INTCONSET = _INTCON_MVEC_MASK; // Multi-vector mode
-    
-    IPC1bits.T1IP = 2;          // Timer 1 interrupt priority 2
-    IPC1bits.T1IS = 1;          // Timer 1 interrupt sub-priority 1
-    IFS0CLR = _IFS0_T1IF_MASK;  // Clear Timer 1 interrupt flag
-    IEC0SET = _IEC0_T1IE_MASK;  // Enable Timer 1 interrupt
-    
-    __asm__("EI");              // Global interrupt enable
+    __builtin_enable_interrupts();     // Global interrupt enable
     
     puts("ILI9486TEST");
     
