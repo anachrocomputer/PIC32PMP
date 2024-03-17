@@ -18,11 +18,11 @@
 #pragma config FVBUSONIO = OFF          // USB VBUS ON Selection (Controlled by Port Function)
 
 // DEVCFG2
-#pragma config FPLLIDIV = DIV_2         // PLL Input Divider (2x Divider)
-#pragma config FPLLMUL = MUL_20         // PLL Multiplier (20x Multiplier)
+#pragma config FPLLIDIV = DIV_4         // PLL Input Divider (4x Divider)
+#pragma config FPLLMUL = MUL_24         // PLL Multiplier (24x Multiplier)
 #pragma config UPLLIDIV = DIV_4         // USB PLL Input Divider (4x Divider)
-#pragma config UPLLEN = ON              // USB PLL Enable (Enabled)
-#pragma config FPLLODIV = DIV_4         // System PLL Output Clock Divider (PLL Divide by 4)
+#pragma config UPLLEN = OFF             // USB PLL Enable (Disabled)
+#pragma config FPLLODIV = DIV_2         // System PLL Output Clock Divider (PLL Divide by 2)
 
 // DEVCFG1
 #pragma config FNOSC = PRIPLL           // Oscillator Selection Bits (Primary Osc w/PLL (XT+,HS+,EC+PLL))
@@ -62,6 +62,8 @@
 
 #include "P1030550_tiny.h"
 #include "CHGUK01.h"
+
+#define FPBCLK  (48000000)      // PBCLK frequency is 48MHz
 
 #define FONT_WD (8)
 #define FONT_HT (8)
@@ -1369,7 +1371,7 @@ void initMillisecondTimer(void)
     T1CONbits.TCKPS = 0;        // Timer 1 prescale: 1
     
     TMR1 = 0x00;                // Clear Timer 1 counter
-    PR1 = 40000 - 1;            // Interrupt every 40000 ticks (1ms)
+    PR1 = (FPBCLK / 1000) - 1;  // Interrupt every millisecond (1kHz)
     
     IPC1bits.T1IP = 7;          // Timer 1 interrupt priority 7 (highest)
     IPC1bits.T1IS = 1;          // Timer 1 interrupt sub-priority 1
@@ -1397,7 +1399,7 @@ static void initUARTs(void)
     
     U3MODEbits.UEN = 3;     // Use just Rx/Tx; no handshaking
     
-    U3BRG = (40000000 / (baud * 16)) - 1;
+    U3BRG = (FPBCLK / (baud * 16)) - 1;
     
     IPC9bits.U3IP = 1;          // UART3 interrupt priority 1 (lowest)
     IPC9bits.U3IS = 0;          // UART3 interrupt sub-priority 0
