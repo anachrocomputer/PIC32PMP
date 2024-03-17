@@ -18,11 +18,11 @@
 #pragma config FVBUSONIO = OFF          // USB VBUS ON Selection (Controlled by Port Function)
 
 // DEVCFG2
-#pragma config FPLLIDIV = DIV_2         // PLL Input Divider (2x Divider)
-#pragma config FPLLMUL = MUL_20         // PLL Multiplier (20x Multiplier)
+#pragma config FPLLIDIV = DIV_4         // PLL Input Divider (4x Divider)
+#pragma config FPLLMUL = MUL_24         // PLL Multiplier (24x Multiplier)
 #pragma config UPLLIDIV = DIV_4         // USB PLL Input Divider (4x Divider)
-#pragma config UPLLEN = ON              // USB PLL Enable (Enabled)
-#pragma config FPLLODIV = DIV_4         // System PLL Output Clock Divider (PLL Divide by 4)
+#pragma config UPLLEN = OFF             // USB PLL Enable (Disabled)
+#pragma config FPLLODIV = DIV_2         // System PLL Output Clock Divider (PLL Divide by 2)
 
 // DEVCFG1
 #pragma config FNOSC = PRIPLL           // Oscillator Selection Bits (Primary Osc w/PLL (XT+,HS+,EC+PLL))
@@ -55,6 +55,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#define FPBCLK  (48000000)      // PBCLK frequency is 48MHz
 
 #define LED1        LATAbits.LATA6
 #define LED2        LATBbits.LATB9
@@ -172,33 +173,6 @@ void __ISR(_UART_3_VECTOR, ipl1AUTO) UART3Handler(void)
 }
 
 
-static void UART3_begin(const int baud)
-{
-    U3Buf.tx.head = 0;
-    U3Buf.tx.tail = 0;
-    U3Buf.rx.head = 0;
-    U3Buf.rx.tail = 0;
-
-    U3MODEbits.UEN = 3;     // Use just Rx/Tx; no handshaking
-    
-    U3STAbits.UTXEN = 1;    // Enable Tx
-    U3STAbits.URXEN = 1;    // Enable Rx
-    
-    U3BRG = (40000000 / (baud * 16)) - 1;
-    
-    IPC9bits.U3IP = 1;          // UART3 interrupt priority 1
-    IPC9bits.U3IS = 0;          // UART3 interrupt sub-priority 0
-    
-    IFS2CLR = _IFS2_U3TXIF_MASK;  // Clear UART3 Tx interrupt flag
-    IFS1CLR = _IFS1_U3RXIF_MASK;  // Clear UART3 Rx interrupt flag
-    IFS1CLR = _IFS1_U3EIF_MASK;   // Clear UART3 error interrupt flag
-    
-    IEC1SET = _IEC1_U3RXIE_MASK;  // Enable UART3 Rx interrupt
-    IEC1SET = _IEC1_U3EIE_MASK;   // Enable UART3 error interrupt
-    
-    U3MODESET = _U3MODE_ON_MASK;      // Enable USART3
-}
-
 uint8_t UART3RxByte(void)
 {
     const uint8_t tmptail = (U3Buf.rx.tail + 1) & UART_RX_BUFFER_MASK;
@@ -244,9 +218,123 @@ void _mon_putc(const char ch)
 }
 
 
-/* PMP_begin --- initialise the Parallel Master Port as an 8-bit Z80-style bus */
+/* PMP_write8 --- write eight characters to the pair of HMDL-2416 displays */
 
-static void PMP_begin(void)
+void PMP_write8(const char msg[])
+{
+    int i;
+    
+    // PMP write cycles: four to CS1 and four to CS2
+    PMADDRSET = _PMADDR_CS1_MASK;   // PMCS1 active
+    PMADDRCLR = _PMADDR_CS2_MASK;   // PMCS2 inactive
+
+    for (i = 0; i < 4; i++)
+    {
+        while (PMMODEbits.BUSY)
+            ;
+
+        PMADDRbits.ADDR = 3 - i;
+        PMDIN = msg[i];
+    }
+
+    while (PMMODEbits.BUSY)
+            ;
+
+    PMADDRCLR = _PMADDR_CS1_MASK;   // PMCS1 inactive
+    PMADDRSET = _PMADDR_CS2_MASK;   // PMCS2 active
+
+    for (i = 0; i < 4; i++)
+    {
+        while (PMMODEbits.BUSY)
+            ;
+
+        PMADDRbits.ADDR = 3 - i;
+        PMDIN = msg[i + 4];
+    }
+
+    while (PMMODEbits.BUSY)
+            ;
+
+    PMADDRCLR = _PMADDR_CS1_MASK;   // PMCS1 inactive
+    PMADDRCLR = _PMADDR_CS2_MASK;   // PMCS2 inactive
+}
+
+
+/* initMCU --- set up the microcontroller in general */
+
+void initMCU(void)
+{
+    /* Configure interrupts */
+    INTCONSET = _INTCON_MVEC_MASK; // Multi-vector mode
+}
+
+
+/* initGPIOs --- set up the GPIO pins */
+
+static void initGPIOs(void)
+{
+    TRISAbits.TRISA7 = 0;   // RA7 pin 92, P3 pin 42 as output (timer toggle)
+    TRISAbits.TRISA6 = 0;   // RA6 pin 91, P3 pin 41 as output (LED1)
+    TRISBbits.TRISB9 = 0;   // RB9 pin 33, P2 pin 33 as output (LED2)
+}
+
+
+/* initMillisecondTimer --- set up a timer to interrupt every millisecond */
+
+void initMillisecondTimer(void)
+{
+    /* Configure Timer 1 for 1kHz/1ms interrupts */
+    T1CONbits.TCKPS = 0;        // Timer 1 prescale: 1
+    
+    TMR1 = 0x00;                // Clear Timer 1 counter
+    PR1 = (FPBCLK / 1000) - 1;  // Interrupt every millisecond (1kHz)
+    
+    IPC1bits.T1IP = 7;          // Timer 1 interrupt priority 7 (highest)
+    IPC1bits.T1IS = 1;          // Timer 1 interrupt sub-priority 1
+    IFS0CLR = _IFS0_T1IF_MASK;  // Clear Timer 1 interrupt flag
+    IEC0SET = _IEC0_T1IE_MASK;  // Enable Timer 1 interrupt
+    
+    T1CONSET = _T1CON_ON_MASK;  // Enable Timer 1
+}
+
+
+/* initUARTs --- set up UART(s) and buffers, and connect to 'stdout' */
+
+static void initUARTs(void)
+{
+    const int baud = 9600;
+    
+    U3Buf.tx.head = 0;
+    U3Buf.tx.tail = 0;
+    U3Buf.rx.head = 0;
+    U3Buf.rx.tail = 0;
+
+    /* Configure PPS */
+    RPC1Rbits.RPC1R = 1;    // U3Tx on pin 6, RPC1, P2 pin 6
+    U3RXRbits.U3RXR = 10;   // U3Rx on pin 9, RPC4, P2 pin 9 (5V tolerant)
+    
+    U3MODEbits.UEN = 3;     // Use just Rx/Tx; no handshaking
+    
+    U3BRG = (FPBCLK / (baud * 16)) - 1;
+    
+    IPC9bits.U3IP = 1;          // UART3 interrupt priority 1 (lowest)
+    IPC9bits.U3IS = 0;          // UART3 interrupt sub-priority 0
+    
+    IFS2CLR = _IFS2_U3TXIF_MASK;  // Clear UART3 Tx interrupt flag
+    IFS1CLR = _IFS1_U3RXIF_MASK;  // Clear UART3 Rx interrupt flag
+    IFS1CLR = _IFS1_U3EIF_MASK;   // Clear UART3 error interrupt flag
+    
+    IEC1SET = _IEC1_U3RXIE_MASK;  // Enable UART3 Rx interrupt
+    IEC1SET = _IEC1_U3EIE_MASK;   // Enable UART3 error interrupt
+    
+    U3MODESET = _U3MODE_ON_MASK;      // Enable USART3
+    U3STASET = _U3STA_UTXEN_MASK | _U3STA_URXEN_MASK; // Enable Rx and Tx
+}
+
+
+/* initPMP --- initialise the Parallel Master Port as an 8-bit Z80-style bus */
+
+static void initPMP(void)
 {
     PMMODEbits.MODE16 = 0;  // 8 data bit mode
     PMMODEbits.WAITB = 3;   // Setup time wait states
@@ -270,125 +358,24 @@ static void PMP_begin(void)
     PMADDRbits.CS1 = 0;     // PMCS1 inactive (pin 71, P3 pin 21)
     PMADDRbits.CS2 = 0;     // PMCS2 inactive (pin 70, P3 pin 20)
     
-    PMCONbits.ON = 1;       // Enable the Parallel Master Port module
-}
-
-
-/* PMP_write8 --- write eight characters to the pair of HMDL-2416 displays */
-
-void PMP_write8(const char msg[])
-{
-    int i;
-    
-    // PMP write cycles: four to CS1 and four to CS2
-    PMADDRbits.CS1 = 1;     // PMCS1 active
-    PMADDRbits.CS2 = 0;     // PMCS2 inactive
-
-    for (i = 0; i < 4; i++)
-    {
-        while (PMMODEbits.BUSY)
-            ;
-
-        PMADDRbits.ADDR = 3 - i;
-        PMDIN = msg[i];
-    }
-
-    while (PMMODEbits.BUSY)
-            ;
-
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive
-    PMADDRbits.CS2 = 1;     // PMCS2 active
-
-    for (i = 0; i < 4; i++)
-    {
-        while (PMMODEbits.BUSY)
-            ;
-
-        PMADDRbits.ADDR = 3 - i;
-        PMDIN = msg[i + 4];
-    }
-
-    while (PMMODEbits.BUSY)
-            ;
-
-    PMADDRbits.CS1 = 0;     // PMCS1 inactive
-    PMADDRbits.CS2 = 0;     // PMCS2 inactive
-}
-
-
-/* PPS_begin --- map Peripheral Pin Select to suit dev board */
-
-static void PPS_begin(void)
-{
-    /* Configure USART3 */
-    RPC1Rbits.RPC1R = 1;    // U3Tx on pin 6, RPC1, P2 pin 6
-    U3RXRbits.U3RXR = 10;   // U3Rx on pin 9, RPC4, P2 pin 9 (5V tolerant)
-    
-    /* Configure SPI1 */
-    // SCK1 on pin 70, RD10 clashes with PMP
-    //SDI1Rbits.SDI1R = 0;   // SDI1 on RPD3
-    //RPC13Rbits.RPC13R = 8; // SDO1 on RPC13
-    
-    /* Configure SPI2 */
-    // SCK2 on pin 10, RG6 clashes with PMP
-    //SDI2Rbits.SDI2R = 0;   // SDI2 on RPD3, pin 78
-    //RPC13Rbits.RPC13R = 6; // SDO2 on RPC13, pin 73
-    
-    /* Configure SPI3 */
-    // SCK3 on pin 39, RF13, P2 pin 39
-    //SDI3Rbits.SDI3R = 0;   // SDI3 on RPD2, pin 77
-    //RPG8Rbits.RPG8R = 14;  // SDO3 on RPG8, pin 12 clashes with PMP
-    
-    /* Configure SPI4 */
-    // SCK4 on pin 48, RD15, P2 pin 48
-}
-
-
-/* TRIS_begin --- switch GPIO pins to input or output as required */
-
-static void TRIS_begin(void)
-{
-    TRISAbits.TRISA7 = 0;   // RA7 pin 92, P3 pin 42 as output (timer toggle)
-    TRISAbits.TRISA6 = 0;   // RA6 pin 91, P3 pin 41 as output (LED1)
-    TRISBbits.TRISB9 = 0;   // RB9 pin 33, P2 pin 33 as output (LED2)
+    PMCONSET = _PMCON_ON_MASK; // Enable the Parallel Master Port module
 }
 
 
 void main(void)
 {
     uint8_t ch;
-    int i;
     volatile int junk;
     char msg[16];
     bool flag = false;
     
-    /* Set up peripherals to match pin connections on PCB */
-    PPS_begin();
+    initMCU();
+    initGPIOs();
+    initUARTs();
+    initPMP();
+    initMillisecondTimer();
     
-    /* Configure tri-state registers */
-    TRIS_begin();
-    
-    UART3_begin(9600);
-    
-    PMP_begin();
-    
-    /* Configure Timer 1 */
-    T1CONbits.TCKPS = 0;        // Timer 1 prescale: 1
-    
-    TMR1 = 0x00;                // Clear Timer 1 counter
-    PR1 = 39999;                // Interrupt every 40000 ticks (1ms)
-    
-    T1CONbits.ON = 1;           // Enable Timer 1
-    
-    /* Configure interrupts */
-    INTCONSET = _INTCON_MVEC_MASK; // Multi-vector mode
-    
-    IPC1bits.T1IP = 2;          // Timer 1 interrupt priority 2
-    IPC1bits.T1IS = 1;          // Timer 1 interrupt sub-priority 1
-    IFS0CLR = _IFS0_T1IF_MASK;  // Clear Timer 1 interrupt flag
-    IEC0SET = _IEC0_T1IE_MASK;  // Enable Timer 1 interrupt
-    
-    __asm__("EI");              // Global interrupt enable
+    __builtin_enable_interrupts();     // Global interrupt enable
     
     puts("PMPTEST");
     
