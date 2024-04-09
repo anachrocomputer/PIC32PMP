@@ -65,17 +65,23 @@
 
 #define FPBCLK  (48000000)      // PBCLK frequency is 48MHz
 
-#define FONT_WD (8)
-#define FONT_HT (8)
+#define LED1    LATAbits.LATA6
+#define LED2    LATBbits.LATB9
 
-#define LED1        LATAbits.LATA6
-#define LED2        LATBbits.LATB9
+#define MAXX      (320)         // Width of screen in pixels
+#define MAXY      (480)         // Height of screen in pixels
 
-#define GRAT_HT  (256)
-#define GRAT_WD  (256)
+#define XC        (MAXX / 2)    // Centre of screen
+#define YC        (MAXY / 2)
 
-#define XMAG   (2)  // For full UK101 effect, set this to 1
-#define YMAG   (2)
+#define FONT_WD   (8)
+#define FONT_HT   (8)
+
+#define GRAT_HT   (256)
+#define GRAT_WD   (256)
+
+#define XMAG      (2)  // For full UK101 effect, set this to 1
+#define YMAG      (2)
 
 #define GRATICULE (32)
 
@@ -1164,7 +1170,7 @@ void drawGraduatedHues(void)
 
     for (x = 0; x < GRAT_WD; x++)
     {
-        ili9486_pixMap(x + ((320 - GRAT_WD) / 2), (480 - GRAT_HT) / 2, 1, GRAT_HT, pixels);
+        ili9486_pixMap(x + ((MAXX - GRAT_WD) / 2), (MAXY - GRAT_HT) / 2, 1, GRAT_HT, pixels);
     }
 
     after = millis();
@@ -1241,7 +1247,7 @@ void drawOscilloscopeDisplay(void)
         interpolateY(wave3, x, yshift3, pixels, LCDColours.trace3);
         interpolateY(wave4, x, yshift4, pixels, LCDColours.trace4);
 
-        ili9486_pixMap(x + ((320 - GRAT_WD) / 2), (480 - GRAT_HT) / 2, 1, GRAT_HT, pixels);
+        ili9486_pixMap(x + ((MAXX - GRAT_WD) / 2), (MAXY - GRAT_HT) / 2, 1, GRAT_HT, pixels);
     }
 
     after = millis();
@@ -1273,7 +1279,7 @@ void drawText(void)
 
         str[16] = '\0';
 
-        ili9486_renderScaledFont((320 - (16 * FONT_WD * XMAG)) / 2, (y * FONT_HT * YMAG) + ((480 - (16 * FONT_HT * YMAG)) / 2), XMAG, YMAG, ILI9486_BLACK, hsvto565(y * 16, MAXPRI, MAXPRI), str);
+        ili9486_renderScaledFont((MAXX - (16 * FONT_WD * XMAG)) / 2, (y * FONT_HT * YMAG) + ((MAXY - (16 * FONT_HT * YMAG)) / 2), XMAG, YMAG, ILI9486_BLACK, hsvto565(y * 16, MAXPRI, MAXPRI), str);
     }
 
     after = millis();
@@ -1289,13 +1295,13 @@ void drawEllipses(void)
     
     before = millis();
         
-    ellipse(160 - 128, 240 - 192, 160 + 128, 240 + 192, ILI9486_GREEN);
+    ellipse(XC - 128, YC - 192, XC + 128, YC + 192, ILI9486_GREEN);
 
     after = millis();
 
-    ellipse(160 - 128, 240 - 160, 160 + 128, 240 + 160, ILI9486_YELLOW);
-    ellipse(160 - 128, 240 - 128, 160 + 128, 240 + 128, ILI9486_BLUE);
-    ellipse(160 - 128, 240 -  96, 160 + 128, 240 +  96, ILI9486_RED);
+    ellipse(XC - 128, YC - 160, XC + 128, YC + 160, ILI9486_YELLOW);
+    ellipse(XC - 128, YC - 128, XC + 128, YC + 128, ILI9486_BLUE);
+    ellipse(XC - 128, YC -  96, XC + 128, YC +  96, ILI9486_RED);
 
     printf("\n%dx%d ellipse took %dms\n", 256, 384, after - before);
 }
@@ -1309,7 +1315,7 @@ void drawCircles(void)
     
     before = millis();
         
-    circle(160, 240, 128, ILI9486_BLACK);
+    circle(XC, YC, 128, ILI9486_BLACK);
 
     after = millis();
     printf("\n%d radius circle took %dms\n", 128, after - before);
@@ -1328,15 +1334,15 @@ void drawLines(void)
     {
         const double theta = ((2.0 * M_PI) / 256.0) * (double)i;
 
-        x[i] = (int)((128.0 * cos(theta)) + 0.5) + 160;
-        y[i] = (int)((128.0 * sin(theta)) + 0.5) + 240;
+        x[i] = (int)((128.0 * cos(theta)) + 0.5) + XC;
+        y[i] = (int)((128.0 * sin(theta)) + 0.5) + YC;
     }
     
     before = millis();
         
     for (i = 0; i < 256; i++)
     {
-        setLine(160, 240, x[i], y[i], ILI9486_WHITE); // hsvto565(i, MAXPRI, MAXPRI));
+        setLine(XC, YC, x[i], y[i], ILI9486_WHITE); // hsvto565(i, MAXPRI, MAXPRI));
     }
 
     after = millis();
@@ -1482,7 +1488,7 @@ void main(void)
         LED1 = 1;
         LED2 = 1;
         ili9486_pixMap(8, 8, 8, 8, pixMap);
-        ili9486_pixMap((320 - 64) / 2, 8, 64, 64, (const uint16_t *)Image);
+        ili9486_pixMap((MAXX - 64) / 2, 8, 64, 64, (const uint16_t *)Image);
         
         drawBoxes();
                 
