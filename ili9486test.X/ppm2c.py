@@ -1,20 +1,26 @@
 # ppm2c --- convert an ASCII PPM fle to a C array              2020-10-28
 # Copyright (c) 2020 John Honniball. All rights reserved
 
-ppm = open('P1030550_tiny.ppm', 'r')
-cArray = open('P1030550_tiny.h', 'w')
+ppmName = 'Sunflower.ppm'
+cName = 'Sunflower.h'
+
+ppm = open(ppmName, 'r')
+cArray = open(cName, 'w')
 
 ppmType = ppm.readline()
 ppmComment = ppm.readline()
 ppmDimensions = ppm.readline()
 ppmMaxPixel = ppm.readline()
 
-cArray.write('const uint16_t Image[64][64] = {\n')
+wd = 320
+ht = 240
 
-for y in range(64):
+cArray.write('const uint16_t %s[%d][%d] = {\n' % ('Sunflower', ht, wd))
+
+for y in range(ht):
     cArray.write('   {')
 
-    for x in range(64):
+    for x in range(wd):
         rStr = ppm.readline()
         gStr = ppm.readline()
         bStr = ppm.readline()
@@ -27,18 +33,19 @@ for y in range(64):
         
         cArray.write("0x%04x" % rgb565)
 
-        if x < 63:
+        if x < (wd - 1):
             if ((x + 1) % 8) == 0:
                 cArray.write(",\n    ")
             else:
                 cArray.write(", ")
 
-    if y < 63:
+    if y < (ht - 1):
         cArray.write('},\n') 
     else:
         cArray.write('}\n')
 
-cArray.write('};')
+cArray.write('};\n')
 
 cArray.close()
 ppm.close()
+

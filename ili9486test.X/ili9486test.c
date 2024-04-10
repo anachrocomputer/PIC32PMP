@@ -60,7 +60,7 @@
 
 // PIC32 with 128k RAM: PIC32MX795F512L-80I/PT
 
-#include "P1030550_tiny.h"
+#include "Sunflower.h"
 #include "CHGUK01.h"
 
 #define FPBCLK  (48000000)      // PBCLK frequency is 48MHz
@@ -1454,6 +1454,8 @@ static void initPMP(void)
 
 void main(void)
 {
+    const int imgWd = 320;
+    const int imgHt = 240;
     static uint16_t pixMap[64] = {0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
                                   0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
                                   0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0,  // green
@@ -1488,7 +1490,9 @@ void main(void)
         LED1 = 1;
         LED2 = 1;
         ili9486_pixMap(8, 8, 8, 8, pixMap);
-        ili9486_pixMap((MAXX - 64) / 2, 8, 64, 64, (const uint16_t *)Image);
+        ili9486_pixMap((MAXX - imgWd) / 2, (MAXY - imgHt) / 2, imgWd, imgHt, (const uint16_t *)Sunflower);
+        
+        delayms(500);
         
         drawBoxes();
                 
