@@ -60,18 +60,21 @@ PMRD is not connected (the displays are write-only) and nor is PMD7
 (they're 7-bit ASCII).
 Some pins on the HMDL-2416 displays are tied HIGH or LOW.
 
-PIC32 pin numbers are for the 100-pin package.
-
-LEDs light when the pin is pulled LOW.
-
 ## Dev PCB Pinout ##
+
 | Signal | Chip  | Name       | Pin | Connector | Name     | Pin |
 |--------|-------|------------|-----|-----------|----------|-----|
 | 5V     |       |            |     |    P3     | USB_5V   | 4   |
 | 3.3V   | PIC32 | Vcc        |     |    P3     | 3V3      | 5   |
 | GND    | PIC32 | GND        |     |    P3     | GND_S    | 15  |
 | GND    | PIC32 | GND        |     |    P3     | GND_S    | 25  |
-| RESET  | PIC32 | RD3        |     |    P3     | RD3      | 28  |
+| LED    | PIC32 | RB9        | 33  |    P2     | RB9      | 33  |
+| SQWAVE | PIC32 | RA7        | 92  |    P3     | RA7      | 42  |
+| RESET  | PIC32 | RD3        | 78  |    P3     | RD3      | 28  |
+
+PIC32 pin numbers are for the 100-pin package.
+
+LED lights when the pin is pulled LOW.
 
 ## Parallel master Port Pinout ##
 
