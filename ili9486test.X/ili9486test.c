@@ -594,6 +594,8 @@ void ili9486_pixMap(const int x1, const int y1, const int wd, const int ht, cons
 }
 
 
+/* setHline --- set a horizontal row of pixels to a given colour */
+
 void setHline(const int x1, const int x2, const int y, const iliColr fg)
 {
     iliCmd4(ILI9486_COL_ADDR, x1 >> 8, x1, x2 >> 8, x2);
@@ -601,6 +603,8 @@ void setHline(const int x1, const int x2, const int y, const iliColr fg)
     ili9486_fill(fg, 1 + x2 - x1);
 }
 
+
+/* setPixel --- set a single pixel at x, y to colour fg */
 
 inline void setPixel(const int x, const int y, const iliColr fg)
 {
@@ -752,6 +756,8 @@ void generateGraticule(const struct ColourScheme *cp)
 }
 
 
+/* interpolateY --- interpolate the scope trace to avoid gaps */
+
 void interpolateY(const uint8_t wave[], const int x, const int yoff, iliColr pixels[], const iliColr colr)
 {
     int y1, y2;
@@ -778,6 +784,8 @@ void interpolateY(const uint8_t wave[], const int x, const int yoff, iliColr pix
     }
 }
 
+
+/* ili9486_renderFont --- render a string in an 8x8 pixel font */
 
 void ili9486_renderFont(const int x1, const int y1, const iliColr fg, const iliColr bg, const uint8_t *const str)
 {
@@ -840,6 +848,8 @@ void ili9486_renderFont(const int x1, const int y1, const iliColr fg, const iliC
     PMDIN = 0xffff; // Keep data bus high to work around a hardware problem
 }
 
+
+/* ili9486_renderScaledFont --- render a string in an 8x8 font, scaled up */
 
 void ili9486_renderScaledFont(const int x1, const int y1, const int xmag, const int ymag, const iliColr fg, const iliColr bg, const uint8_t * const str)
 {
@@ -1082,7 +1092,9 @@ void ellipse(int x0, int y0, int x1, int y1, const int fg)
 }
 
 
-static void cpts(const int x0, const int y0, const int x, const int y, const iliColr fg)
+/* cfill --- fill a circle given centre and offsets, using symmetry */
+
+static void cfill(const int x0, const int y0, const int x, const int y, const iliColr fg)
 {
     setHline(x0 - x, x0 + x, y0 + y, fg);
     setHline(x0 - x, x0 + x, y0 - y, fg);
@@ -1091,7 +1103,7 @@ static void cpts(const int x0, const int y0, const int x, const int y, const ili
 }
 
 
-/* circle --- draw a circle using Michener's algorithm */
+/* circle --- draw a filled circle using Michener's algorithm */
 
 void circle(const int x0, const int y0, const int r, const iliColr fg)
 {
@@ -1104,7 +1116,7 @@ void circle(const int x0, const int y0, const int r, const iliColr fg)
 
     while (x < y)
     {
-        cpts (x0, y0, x, y, fg);
+        cfill (x0, y0, x, y, fg);
 
         if (d < 0)
         {
@@ -1120,7 +1132,7 @@ void circle(const int x0, const int y0, const int r, const iliColr fg)
     }
 
     if (x == y)
-       cpts(x0, y0, x, y, fg);
+       cfill(x0, y0, x, y, fg);
 }
 
 
@@ -1149,16 +1161,6 @@ void drawGraduatedHues(void)
     uint32_t before, after;
     iliColr pixels[GRAT_HT];
     int x, y;
-
-    before = millis();
-
-    for (x = 0; x < GRAT_WD; x++)
-    {
-        memcpy(pixels, C1grat, sizeof (pixels));
-    }
-
-    after = millis();
-    printf("\n%dx%d byte memcpy() took %dms\n", GRAT_WD, sizeof (pixels), after - before);
 
     for (y = 0; y < GRAT_HT; y++)
     {
@@ -1217,6 +1219,16 @@ void drawOscilloscopeDisplay(void)
     }
     
     before = millis();
+
+    for (x = 0; x < GRAT_WD; x++)
+    {
+        memcpy(pixels, C1grat, sizeof (pixels));
+    }
+
+    after = millis();
+    printf("\n%dx%d byte memcpy() took %dms\n", GRAT_WD, sizeof (pixels), after - before);
+
+    before = millis();
         
     for (x = 0; x < GRAT_WD; x++)
     {
@@ -1250,7 +1262,7 @@ void drawOscilloscopeDisplay(void)
     }
 
     after = millis();
-    printf("\n%dx%d scope display took %dms\n", GRAT_WD, GRAT_HT, after - before);
+    printf("%dx%d scope display took %dms\n", GRAT_WD, GRAT_HT, after - before);
 }
 
 
@@ -1266,6 +1278,11 @@ void drawText(void)
         
     for (y = 0; y < 16; y++)
     {
+        const iliColr fg = ILI9486_BLACK;
+        const iliColr bg = hsvto565(y * 16, MAXPRI, MAXPRI);
+        const int x0 = (MAXX - (16 * FONT_WD * XMAG)) / 2;
+        const int y0 = (y * FONT_HT * YMAG) + ((MAXY - (16 * FONT_HT * YMAG)) / 2);
+        
         for (x = 0; x < 16; x++)
         {
             uint8_t ch = (y * 16) + x;
@@ -1278,7 +1295,7 @@ void drawText(void)
 
         str[16] = '\0';
 
-        ili9486_renderScaledFont((MAXX - (16 * FONT_WD * XMAG)) / 2, (y * FONT_HT * YMAG) + ((MAXY - (16 * FONT_HT * YMAG)) / 2), XMAG, YMAG, ILI9486_BLACK, hsvto565(y * 16, MAXPRI, MAXPRI), str);
+        ili9486_renderScaledFont(x0, y0, XMAG, YMAG, fg, bg, str);
     }
 
     after = millis();
