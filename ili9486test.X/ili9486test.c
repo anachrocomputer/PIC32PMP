@@ -1506,14 +1506,6 @@ void main(void)
 {
     const int imgWd = 320;
     const int imgHt = 240;
-    static uint16_t pixMap[64] = {0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
-                                  0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f, 0x001f,  // blue
-                                  0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0,  // green
-                                  0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0, 0x07e0,  // green
-                                  0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800,  // red
-                                  0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800, 0xf800,  // red
-                                  0xffff, 0x0000, 0xffff, 0x0000, 0xffff, 0x0000, 0xffff, 0x0000,  // black/white
-                                  0x0000, 0xffff, 0x0000, 0xffff, 0x0000, 0xffff, 0x0000, 0xffff}; // black/white
     
     initMCU();
     initGPIOs();
@@ -1537,7 +1529,6 @@ void main(void)
         delayms(500);
                
         LED = 1;
-        ili9486_pixMap(8, 8, 8, 8, pixMap);
         ili9486_pixMap((MAXX - imgWd) / 2, (MAXY - imgHt) / 2, imgWd, imgHt, (const uint16_t *)Sunflower);
         
         delayms(500);
