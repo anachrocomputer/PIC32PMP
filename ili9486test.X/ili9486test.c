@@ -65,8 +65,7 @@
 
 #define FPBCLK  (48000000)      // PBCLK frequency is 48MHz
 
-#define LED1    LATAbits.LATA6
-#define LED2    LATBbits.LATB9
+#define LED       LATBbits.LATB9
 
 #define MAXX      (320)         // Width of screen in pixels
 #define MAXY      (480)         // Height of screen in pixels
@@ -1364,8 +1363,7 @@ void initMCU(void)
 static void initGPIOs(void)
 {
     TRISAbits.TRISA7 = 0;   // RA7 pin 92, P3 pin 42 as output (timer toggle)
-    TRISAbits.TRISA6 = 0;   // RA6 pin 91, P3 pin 41 as output (LED1)
-    TRISBbits.TRISB9 = 0;   // RB9 pin 33, P2 pin 33 as output (LED2)
+    TRISBbits.TRISB9 = 0;   // RB9 pin 33, P2 pin 33 as output (LED)
 }
 
 
@@ -1481,25 +1479,24 @@ void main(void)
     
     while (1)
     {
-        LED1 = 0;
-        LED2 = 1;
+        LED = 0;
         ili9486_fillRect(0, 0, MAXX - 1, MAXY - 1, ILI9486_WHITE);    // Clear the screen
         
         delayms(500);
                
-        LED1 = 1;
-        LED2 = 1;
+        LED = 1;
         ili9486_pixMap(8, 8, 8, 8, pixMap);
         ili9486_pixMap((MAXX - imgWd) / 2, (MAXY - imgHt) / 2, imgWd, imgHt, (const uint16_t *)Sunflower);
         
         delayms(500);
         
+        LED = 0;
+        
         drawBoxes();
                 
         delayms(500);
         
-        LED1 = 0;
-        LED2 = 0;
+        LED = 1;
 
         drawGraduatedHues();
         
@@ -1514,30 +1511,34 @@ void main(void)
             printf("%X", 0xdeadbeef);
         }
         
-        LED1 = 1;
-        LED2 = 0;
+        LED = 0;
         
         drawOscilloscopeDisplay();
         
         delayms(500);
         
-        LED1 = 1;
-        LED2 = 0;
+        LED = 1;
         
         drawText();
         
         delayms(500);
         
+        LED = 0;
+        
         drawEllipses();
         
         delayms(500);
+        
+        LED = 1;
         
         drawCircles();
         
         delayms(500);
         
-        drawLines();
+        LED = 0;
         
+        drawLines();
+
         delayms(500);
     }
 }
