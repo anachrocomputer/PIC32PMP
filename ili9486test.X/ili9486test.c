@@ -1483,7 +1483,7 @@ void main(void)
     {
         LED1 = 0;
         LED2 = 1;
-        ili9486_fillRect(0, 0, 319, 479, ILI9486_WHITE);    // Clear the screen
+        ili9486_fillRect(0, 0, MAXX - 1, MAXY - 1, ILI9486_WHITE);    // Clear the screen
         
         delayms(500);
                
