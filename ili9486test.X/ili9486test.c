@@ -79,6 +79,9 @@
 #define GRAT_HT   (256)
 #define GRAT_WD   (256)
 
+#define FB_HT     (110)         // As big as we can fit into RAM
+#define FB_WD     (110)
+
 #define XMAG      (2)  // For full UK101 effect, set this to 1
 #define YMAG      (2)
 
@@ -165,6 +168,7 @@ iliColr Bgrat[GRAT_HT];
 iliColr Dgrat[GRAT_HT];
 iliColr Tgrat[GRAT_HT];
 iliColr Wgrat[GRAT_HT];
+iliColr FrameBuffer[FB_HT][FB_WD];
     
 #define UART_RX_BUFFER_SIZE  (128)
 #define UART_RX_BUFFER_MASK (UART_RX_BUFFER_SIZE - 1)
@@ -1366,6 +1370,37 @@ void drawLines(void)
 }
 
 
+/* drawRandomNoise --- fill a framebuffer with random pixels and copy to display */
+
+void drawRandomNoise(void)
+{
+    uint32_t end;
+    iliColr pixels[MAXPRI + 1];
+    int x, y;
+    
+    // Precompute saturated colours because hsvto565 is way too slow to call for entire buffer
+    for (y = 0; y < MAXPRI + 1; y++)
+    {
+        pixels[y] = hsvto565(y, MAXPRI, MAXPRI);
+    }
+    
+    end = millis() + 500;
+    
+    while (millis() < end)
+    {
+        for (y = 0; y < FB_HT; y++)
+        {
+            for (x = 0; x < FB_WD; x++)
+            {
+                FrameBuffer[y][x] = pixels[(rand() >> 7) & 255];
+            }
+        }
+        
+        ili9486_pixMap((MAXX - FB_WD) / 2, (MAXY - FB_HT) / 2, FB_WD, FB_HT, (const uint16_t *)FrameBuffer);
+    }
+}
+
+
 /* initMCU --- set up the microcontroller in general */
 
 void initMCU(void)
@@ -1557,5 +1592,9 @@ void main(void)
         drawLines();
 
         delayms(500);
+        
+        LED = 1;
+        
+        drawRandomNoise();
     }
 }
