@@ -1,21 +1,46 @@
 # ppm2c --- convert an ASCII PPM fle to a C array              2020-10-28
 # Copyright (c) 2020 John Honniball. All rights reserved
 
-ppmName = 'Sunflower.ppm'
-cName = 'Sunflower.h'
+import sys
+import os
 
-ppm = open(ppmName, 'r')
-cArray = open(cName, 'w')
+if len(sys.argv) != 2:
+    print("Usage: ppm2c <ppm_filename>")
+    exit()
+
+(imgName, extName) = os.path.splitext(os.path.basename(sys.argv[1]))
+cName = imgName + '.h'
+
+ppm = open(sys.argv[1], 'r')
 
 ppmType = ppm.readline()
+
+if ppmType.strip() != 'P3':
+    print("PPM file must be in ASCII format (P3)")
+    ppm.close()
+    exit()
+
 ppmComment = ppm.readline()
 ppmDimensions = ppm.readline()
 ppmMaxPixel = ppm.readline()
 
-wd = 320
-ht = 240
+(wdStr, htStr) = ppmDimensions.split(' ')
 
-cArray.write('const uint16_t %s[%d][%d] = {\n' % ('Sunflower', ht, wd))
+wd = int(wdStr)
+ht = int(htStr)
+
+if (wd < 1) or (wd > 320):
+    print("Image width (%d) is no good" % wd)
+    ppm.close()
+    exit()
+
+if (ht < 1) or (ht > 480):
+    print("Image height (%d) is no good" % ht)
+    ppm.close()
+    exit()
+
+cArray = open(cName, 'w')
+cArray.write('const uint16_t %s[%d][%d] = {\n' % (imgName, ht, wd))
 
 for y in range(ht):
     cArray.write('   {')

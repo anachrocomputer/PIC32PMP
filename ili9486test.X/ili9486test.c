@@ -1504,8 +1504,8 @@ static void initPMP(void)
 
 void main(void)
 {
-    const int imgWd = 320;
-    const int imgHt = 240;
+    const int imgWd = sizeof (Sunflower[0]) / sizeof (Sunflower[0][0]);
+    const int imgHt = (sizeof (Sunflower) / imgWd) / sizeof (Sunflower[0][0]);
     
     initMCU();
     initGPIOs();
