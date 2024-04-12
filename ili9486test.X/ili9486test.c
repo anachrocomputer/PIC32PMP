@@ -79,8 +79,8 @@
 #define GRAT_HT   (256)
 #define GRAT_WD   (256)
 
-#define FB_HT     (110)         // As big as we can fit into RAM
-#define FB_WD     (110)
+#define FB_HT     (96)          // As big as we can fit into RAM
+#define FB_WD     (128)
 
 #define XMAG      (2)  // For full UK101 effect, set this to 1
 #define YMAG      (2)
@@ -1392,7 +1392,7 @@ void drawRandomNoise(void)
         {
             for (x = 0; x < FB_WD; x++)
             {
-                FrameBuffer[y][x] = pixels[(rand() >> 7) & 255];
+                FrameBuffer[y][x] = pixels[(rand() >> 21) & 255];
             }
         }
         
