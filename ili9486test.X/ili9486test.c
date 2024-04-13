@@ -1378,6 +1378,14 @@ void drawRandomNoise(void)
     iliColr pixels[MAXPRI + 1];
     int x, y;
     
+    x = (MAXX - 256) / 2;
+    y = (MAXY - 192) / 2;
+    ili9486_fillRect(x, y, x + 256, y + 192, ILI9486_BLACK);    // A 256x192 frame buffer would be 96k
+    
+    x = (MAXX - 192) / 2;
+    y = (MAXY - 144) / 2;
+    ili9486_fillRect(x, y, x + 192, y + 144, ILI9486_ORANGE);   // A 192x144 frame buffer would be 54k
+    
     // Precompute saturated colours because hsvto565 is way too slow to call for entire buffer
     for (y = 0; y < MAXPRI + 1; y++)
     {
