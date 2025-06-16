@@ -1,3 +1,7 @@
+![Static Badge](https://img.shields.io/badge/MCU-PIC32MX-green "MCU:PIC32MX")
+![Static Badge](https://img.shields.io/badge/IDE-MPLAB_X_V6.20-green "IDE:MPLAB_X_V6.20")
+![Static Badge](https://img.shields.io/badge/BOARD-Reach_Dev_PCB-green "BOARD:Reach Leg Test PCB")
+
 # PIC32PMP #
 
 Explore the PIC32's Parallel Master Port on a PIC250F256L dev board.
@@ -138,6 +142,17 @@ Pin goes LOW when pressed.
 | PMD13  | PIC32 | RD13/PMD13 | 80  |    P3     | RD13     | 30  |
 | PMD14  | PIC32 | RD6/PMD14  | 83  |    P3     | DIP2_1   | 33  |
 | PMD15  | PIC32 | RD7/PMD15  | 84  |    P3     | DIP2_2   | 34  |
+
+## PIC32 Toolchain ##
+
+MPLAB X V6.20 and 'xc32' V4.60.
+These are not quite the latest versions,
+but MPLAB X V6.20 is the last version to support my "long obsolete" ICD3 programmer.
+
+## PIC32 Programmer ##
+
+Microchip ICD3.
+Other programmers should work, e.g. ICD4 or PICkit4.
 
 
 
