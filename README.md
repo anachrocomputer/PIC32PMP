@@ -1,6 +1,6 @@
 ![Static Badge](https://img.shields.io/badge/MCU-PIC32MX-green "MCU:PIC32MX")
 ![Static Badge](https://img.shields.io/badge/IDE-MPLAB_X_V6.20-green "IDE:MPLAB_X_V6.20")
-![Static Badge](https://img.shields.io/badge/BOARD-Reach_Dev_PCB-green "BOARD:Reach Leg Test PCB")
+![Static Badge](https://img.shields.io/badge/BOARD-Reach_Leg_Test_PCB-green "BOARD:Reach Leg Test PCB")
 
 # PIC32PMP #
 
